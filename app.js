@@ -45,8 +45,17 @@ const TAGE = [
 let teamData         = [];
 let spielerInfos     = [];
 let ueberschneidungen = {};
+let tageDatum        = {};
 let dataLoaded       = false;
 let selectedLineupPlayers = [];
+
+// Hilfsfunktion: Gibt die Anzeige-Beschriftung für einen Wochentag zurück (z. B. "Montag (16.10.)")
+function getDayFullLabel(tagKey) {
+    const t = TAGE.find(x => x.key === tagKey);
+    const base = t ? t.label : tagKey;
+    const d = tageDatum && tageDatum[tagKey] ? tageDatum[tagKey].trim() : '';
+    return d ? `${base} (${d})` : base;
+}
 
 // ============================================================================
 // NAVIGATION
@@ -95,7 +104,48 @@ async function loadData() {
             teamData          = result.zeitplan      || [];
             spielerInfos      = result.spielerInfo   || [];
             ueberschneidungen = result.ueberschneidungen || {};
-            dataLoaded        = true;
+            tageDatum = result.tageDatum || {};
+
+            // Falls das Sheet-Skript noch leere Werte liefert (hasAnyDate == false), Datumszeile direkt laden
+            const hasAnyDate = Object.values(tageDatum).some(d => d && d.trim().length > 0);
+            if (!hasAnyDate) {
+                try {
+                    const csvUrl = "https://docs.google.com/spreadsheets/d/1DHDYG4fihnxHTGgA4cQv15glAG0zNQqSy5hn3dPm2Xg/gviz/tq?tqx=out:csv&sheet=Zeitplaner";
+                    const csvResp = await fetch(csvUrl);
+                    if (csvResp.ok) {
+                        const csvText = await csvResp.text();
+                        const lines = csvText.split(/\r?\n/);
+                        const dateLine = lines.find(l => /\d{1,2}\.\d{1,2}\.\d{2,4}/.test(l));
+                        if (dateLine) {
+                            const dateMatches = dateLine.match(/\d{1,2}\.\d{1,2}\.?/g) || [];
+                            if (dateMatches.length >= 7) {
+                                TAGE.forEach((t, idx) => {
+                                    let dStr = dateMatches[idx].trim();
+                                    if (!dStr.endsWith('.')) dStr += '.';
+                                    tageDatum[t.key] = dStr;
+                                });
+                            }
+                        }
+                    }
+                } catch (eCsv) {
+                    console.warn("CSV Datums-Laden fehlgeschlagen:", eCsv);
+                }
+            }
+
+            // Statischer Fallback für den unwahrscheinlichen Fall kompletter Offline-/CORS-Blockade
+            if (!Object.values(tageDatum).some(d => d && d.trim().length > 0)) {
+                tageDatum = {
+                    montag: "19.10.",
+                    dienstag: "20.10.",
+                    mittwoch: "21.10.",
+                    donnerstag: "22.10.",
+                    freitag: "16.10.",
+                    samstag: "17.10.",
+                    sonntag: "18.10."
+                };
+            }
+
+            dataLoaded = true;
 
             syncStatus.innerHTML   = '<i class="fa-solid fa-check"></i> Verbunden';
             syncStatus.style.color = 'var(--success)';
@@ -328,11 +378,15 @@ function buildSpielerZeitenKarte(player) {
         const s2Vb  = !!rawS2.vielleicht;
 
         const isDayEmpty = (!s1von && !s1bis && !s2von && !s2bis);
+        const dayDate = tageDatum && tageDatum[tag.key] ? tageDatum[tag.key].trim() : '';
+        const dayDateSuffix = dayDate ? ` <span class="tag-date">(${dayDate})</span>` : '';
 
         tageHtml += `
             <div class="tag-block ${isDayEmpty ? 'is-no-time' : ''}" data-day="${tag.key}">
                 <div class="tag-block-header">
-                    <div class="tag-label">${tag.label.substring(0, 2)}<span class="tag-label-full">${tag.label.substring(2)}</span></div>
+                    <div class="tag-label">
+                        ${tag.label.substring(0, 2)}<span class="tag-label-full">${tag.label.substring(2)}</span>${dayDateSuffix}
+                    </div>
                     <div class="tag-actions">
                         <button type="button" class="btn-clear-day" title="Keine Zeit (Tag leeren)" onclick="clearDayTimes(this, '${tag.key}')">
                             <i class="fa-solid fa-ban"></i> Keine Zeit
