@@ -1,0 +1,1245 @@
+/* ============================================================================
+   5Q Zeitplaner – style.css Version 2.0
+   ============================================================================ */
+
+:root {
+    --bg-color: #0f172a;
+    --card-bg: rgba(30, 41, 59, 0.75);
+    --primary: #8b5cf6;
+    --primary-hover: #7c3aed;
+    --primary-glow: rgba(139, 92, 246, 0.3);
+    --secondary: #38bdf8;
+    --accent-gold: #f59e0b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --success: #10b981;
+    --danger: #ef4444;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Outfit', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ============ HINTERGRUND ============ */
+.background-animation {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: -1;
+    background:
+        radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.18), transparent 30%),
+        radial-gradient(circle at 85% 20%, rgba(56, 189, 248, 0.15), transparent 30%),
+        radial-gradient(circle at 50% 90%, rgba(245, 158, 11, 0.08), transparent 30%);
+    animation: pulse 18s infinite alternate;
+}
+
+@keyframes pulse {
+    0%   { transform: scale(1); }
+    100% { transform: scale(1.08); }
+}
+
+/* ============ HEADER ============ */
+.glass-header {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.9rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logo i { color: var(--primary); }
+
+nav {
+    display: flex;
+    gap: 0.5rem;
+}
+
+nav button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+nav button:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+nav button.active {
+    color: var(--text-main);
+    background: var(--primary);
+    box-shadow: 0 0 16px var(--primary-glow);
+}
+
+.user-status {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+/* ============ LAYOUT ============ */
+.container {
+    max-width: 1300px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+.view {
+    display: none;
+    animation: fadeIn 0.35s ease-out forwards;
+}
+
+.view.active-view { display: block; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-header {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.dashboard-header h1, .dashboard-header h2 {
+    font-size: 2.2rem;
+    margin-bottom: 0.4rem;
+    background: linear-gradient(to right, #fff, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.dashboard-header p {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+/* ============ GLASS CARDS ============ */
+.glass-panel, .player-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.12);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.player-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px var(--primary-glow);
+    border-color: rgba(139, 92, 246, 0.35);
+}
+
+.full-width-msg {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* ============ PLAYER GRID ============ */
+.player-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+/* ============ PLAYER HEADER ============ */
+.player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.player-info h3 {
+    font-size: 1.15rem;
+    color: var(--text-main);
+}
+
+.player-info p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+}
+
+.role-badge {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.role-badge.sub-role {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+}
+
+/* ============ DASHBOARD – ÜBERSCHNEIDUNGS-KARTEN ============ */
+.dashboard-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.info-card {
+    display: flex;
+    gap: 1.2rem;
+    align-items: flex-start;
+}
+
+.info-card-icon {
+    font-size: 2rem;
+    color: var(--accent-gold);
+    padding: 0.6rem;
+    background: rgba(245, 158, 11, 0.12);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 54px;
+    height: 54px;
+    flex-shrink: 0;
+}
+
+.info-card-icon.secondary {
+    color: var(--secondary);
+    background: rgba(56, 189, 248, 0.12);
+}
+
+.info-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.info-card-body h2 {
+    font-size: 1.2rem;
+    margin-bottom: 0.2rem;
+}
+
+.info-card-subtitle {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.highlight-card {
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: 0 4px 30px rgba(245, 158, 11, 0.08);
+}
+
+/* Tag-Abschnitte im Dashboard */
+.tag-section {
+    margin-bottom: 1.2rem;
+}
+
+.tag-section:last-child { margin-bottom: 0; }
+
+.tag-section-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.overlap-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.overlap-block {
+    border-radius: 10px;
+    padding: 0.55rem 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    border: 1px solid transparent;
+}
+
+.overlap-block.fiveq {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.overlap-block.partial {
+    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.2);
+}
+
+.overlap-time {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--text-main);
+    min-width: 115px;
+}
+
+.overlap-block.fiveq .overlap-time i  { color: var(--accent-gold); }
+.overlap-block.partial .overlap-time i { color: var(--secondary); }
+
+.overlap-players {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    flex: 1;
+    line-height: 1.5;
+}
+
+.no-data-msg {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Skeleton Lines */
+.skeleton-line {
+    height: 14px;
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.06) 25%,
+        rgba(255,255,255,0.12) 50%,
+        rgba(255,255,255,0.06) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.skeleton-line.short { width: 60%; }
+
+/* ============ SPIELERZEITEN – KARTEN ============ */
+.zeit-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Tage-Grid: kompakt, alle 7 Tage nebeneinander */
+.tage-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+.tag-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.tag-block:hover {
+    background: rgba(139, 92, 246, 0.06);
+    border-color: rgba(139, 92, 246, 0.25);
+}
+
+.tag-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
+}
+
+.tag-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.tag-label-full {
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--text-muted);
+    text-transform: none;
+}
+
+.tag-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* Zwei Slots unter dem Header */
+.slots {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+}
+
+.slot {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.slot-sep {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.time-input {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-main);
+    font-size: 0.82rem;
+    padding: 0.28rem 0.45rem;
+    width: 88px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    font-family: 'Outfit', monospace;
+    flex-shrink: 0;
+}
+
+.time-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.slot {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+}
+
+/* Karten-Footer */
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.8rem;
+    border-top: 1px dashed var(--border);
+    gap: 0.5rem;
+}
+
+.last-update {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.btn-save {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background 0.25s, transform 0.15s, box-shadow 0.25s;
+    white-space: nowrap;
+}
+
+.btn-save:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px var(--primary-glow);
+}
+
+.btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.save-msg {
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.4rem 0.7rem;
+    border-radius: 6px;
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+.save-msg.hidden  { display: none; }
+.save-msg.success { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid var(--success); }
+.save-msg.error   { background: rgba(239, 68, 68, 0.15);  color: var(--danger);  border: 1px solid var(--danger);  }
+
+/* ============ SPIELERINFOS – LANE-KARTEN ============ */
+.lane-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.lane-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.lane-item.main-lane {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.lane-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+}
+
+.lane-header-row strong {
+    font-size: 0.88rem;
+    color: var(--text-main);
+}
+
+.weight-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.lane-item.main-lane .weight-badge { color: var(--primary); }
+
+.weight-bar-bg {
+    height: 5px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    margin-bottom: 0.3rem;
+    overflow: hidden;
+}
+
+.weight-bar-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+.lane-heroes {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+/* ============ SKELETON LOADER ============ */
+.skeleton-card {
+    height: 280px;
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.05) 25%,
+        rgba(255,255,255,0.1) 50%,
+        rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+
+@keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+}
+
+/* ============ SCHEDULE LIST (alte Ansicht, bleibt für Spielerinfos) ============ */
+.schedule-list {
+    list-style: none;
+    font-size: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.schedule-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0.8rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    align-items: center;
+}
+
+.schedule-list li .day { color: var(--text-muted); }
+.schedule-list li .time { color: var(--text-main); font-weight: 600; }
+
+/* ============ ZEIT-SLOT CONTROLS (Vielleicht & Keine Zeit) ============ */
+.btn-clear-day {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.btn-clear-day:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ffffff;
+    border-color: var(--danger);
+}
+
+.btn-vielleicht-toggle {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 4px;
+    padding: 0.18rem 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    line-height: 1;
+}
+
+.btn-vielleicht-toggle:hover {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--accent-gold);
+}
+
+.btn-vielleicht-toggle.active {
+    background: rgba(245, 158, 11, 0.25);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.tag-block.is-no-time {
+    opacity: 0.55;
+    background: rgba(239, 68, 68, 0.03);
+    border-color: rgba(239, 68, 68, 0.15);
+}
+
+.tag-block.has-vielleicht {
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+/* ============ SPIELERINFO - EDIT MODUS & IDENTITÄT ============ */
+.btn-edit-info, .btn-edit-identity {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 0.3rem 0.65rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.btn-edit-info:hover, .btn-edit-identity:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: var(--primary);
+    color: white;
+}
+
+.player-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* Identitäts-Editor Modal / Inline-Box */
+.identity-edit-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem;
+    margin-bottom: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.identity-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.identity-field-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.identity-input, .identity-select {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+
+.identity-select option {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+.identity-input:focus, .identity-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+/* Differenzierte Badges für Main- & Ersatzspieler */
+.role-badge.sub-1 { background: rgba(245, 158, 11, 0.25); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+.role-badge.sub-2 { background: rgba(251, 146, 60, 0.22); color: #fdba74; border: 1px solid rgba(251, 146, 60, 0.4); }
+.role-badge.sub-3 { background: rgba(234, 179, 8, 0.2);   color: #fef08a; border: 1px solid rgba(234, 179, 8, 0.35); }
+.role-badge.sub-4 { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+.role-badge.sub-5 { background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+.lane-points-counter {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.points-val {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.points-val.valid { color: var(--success); }
+.points-val.invalid { color: var(--danger); }
+
+.lane-edit-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.lane-edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+
+.lane-weight-input {
+    width: 58px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-main);
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.heroes-edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+}
+
+.hero-edit-input {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: var(--text-main);
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+    transition: border-color 0.2s;
+}
+
+.hero-edit-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.edit-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed var(--border);
+}
+
+.btn-cancel-edit {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel-edit:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============ ROLLEN-VERTEILUNG (LINEUP-RECHNER) ============ */
+.lineup-control-panel {
+    margin-bottom: 1.5rem;
+}
+
+.lineup-selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+.lineup-selector-header h3 {
+    font-size: 1.1rem;
+    color: var(--text-main);
+}
+
+.lineup-quick-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-secondary-sm {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all 0.2s;
+}
+
+.btn-secondary-sm:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: var(--primary);
+}
+
+.player-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.player-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.4rem 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.player-chip:hover {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: var(--text-main);
+}
+
+.player-chip.selected {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.lineup-result-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.lineup-summary-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+}
+
+.lineup-score-tag {
+    font-size: 1.1rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.lineup-score-tag .score-num {
+    color: var(--accent-gold);
+    font-size: 1.3rem;
+}
+
+.lineup-lanes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.lineup-lane-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(12px);
+    transition: transform 0.2s, border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.lineup-lane-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+}
+
+.lineup-lane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.lineup-lane-name {
+    font-weight: 800;
+    font-size: 1rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.lineup-player-assigned {
+    margin-bottom: 0.6rem;
+}
+
+.lineup-player-assigned h4 {
+    font-size: 1.15rem;
+    color: var(--text-main);
+}
+
+.lineup-player-assigned p {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.lineup-lane-heroes-box {
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
+.lineup-lane-heroes-box small {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 0.2rem;
+}
+
+.lineup-heroes-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.hero-tag {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--text-main);
+}
+
+/* ============ RESPONSIVE & MOBILE DESIGN ============ */
+@media (max-width: 900px) {
+    .dashboard-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .container {
+        padding: 0 1rem;
+        margin: 1.2rem auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .glass-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .glass-header .logo {
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    nav {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.3rem;
+        width: 100%;
+    }
+
+    nav button {
+        padding: 0.55rem 0.3rem;
+        font-size: 0.75rem;
+        justify-content: center;
+        text-align: center;
+        flex-direction: column;
+        gap: 0.25rem;
+        border-radius: 8px;
+    }
+
+    nav button i {
+        font-size: 1rem;
+    }
+
+    .user-status {
+        text-align: center;
+        font-size: 0.78rem;
+    }
+
+    .dashboard-header h1,
+    .dashboard-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .dashboard-header p {
+        font-size: 0.88rem;
+    }
+
+    .player-grid {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+    }
+
+    .info-card {
+        flex-direction: column;
+        padding: 1.2rem;
+    }
+
+    .info-card-icon {
+        min-width: auto;
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .overlap-block {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+
+    /* Spielerzeiten-Karten mobil */
+    .glass-panel, .player-card {
+        padding: 1rem;
+        border-radius: 12px;
+    }
+
+    .tag-block {
+        padding: 0.5rem 0.6rem;
+    }
+
+    .tag-label {
+        font-size: 0.82rem;
+    }
+
+    .btn-clear-day {
+        padding: 0.2rem 0.45rem;
+        font-size: 0.72rem;
+    }
+
+    .slot {
+        justify-content: flex-start;
+        gap: 0.35rem;
+    }
+
+    .time-input {
+        width: calc(50% - 28px);
+        min-width: 78px;
+        font-size: 0.85rem;
+        padding: 0.35rem 0.4rem;
+    }
+
+    .btn-vielleicht-toggle {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    /* Rollen-Verteilung mobil */
+    .lineup-summary-bar {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+        gap: 0.8rem;
+    }
+
+    .lineup-actions {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .lineup-lanes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .heroes-edit-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    nav button {
+        font-size: 0.7rem;
+        padding: 0.45rem 0.2rem;
+    }
+
+    .slot {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .time-input {
+        width: 100%;
+        min-width: 0;
+        text-align: center;
+    }
+
+    .btn-vielleicht-toggle {
+        padding: 0.35rem 0.4rem;
+        font-size: 0.7rem;
+    }
+
+    .card-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+    }
+
+    .btn-save {
+        width: 100%;
+        justify-content: center;
+        padding: 0.6rem 1rem;
+        font-size: 0.95rem;
+    }
+
+    .heroes-edit-grid {
+        grid-template-columns: 1fr;
+    }
+}

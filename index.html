@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5Q Zeitplaner & Dashboard</title>
+    <meta name="description" content="Team-Zeitplaner für 5Q – Überschneidungen, Spielerzeiten und Spielerinfos auf einen Blick.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="background-animation"></div>
+
+    <header class="glass-header">
+        <div class="logo">
+            <i class="fa-solid fa-gamepad"></i> 5Q Zeitplaner
+        </div>
+        <nav>
+            <button id="btn-dashboard" class="active"><i class="fa-solid fa-chart-line"></i> Dashboard</button>
+            <button id="btn-spielerzeiten"><i class="fa-solid fa-clock"></i> Spielerzeiten</button>
+            <button id="btn-info"><i class="fa-solid fa-address-card"></i> Spielerinfos</button>
+            <button id="btn-lineup"><i class="fa-solid fa-chess-knight"></i> Rollen-Verteilung</button>
+        </nav>
+        <div class="user-status">
+            <span id="sync-status"><i class="fa-solid fa-cloud-arrow-down"></i> Lade Daten...</span>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- ===== DASHBOARD ANSICHT ===== -->
+        <section id="view-dashboard" class="view active-view">
+            <div class="dashboard-header">
+                <h1><i class="fa-solid fa-shield-halved"></i> 5Q Team-Dashboard</h1>
+                <p>Mögliche Spielzeiten und Überschneidungen auf einen Blick</p>
+            </div>
+
+            <!-- 5Q TIME KARTE -->
+            <div class="dashboard-cards">
+                <div class="info-card highlight-card glass-panel" id="card-5q">
+                    <div class="info-card-icon"><i class="fa-solid fa-trophy"></i></div>
+                    <div class="info-card-body">
+                        <h2>Mögliche 5Q-Time</h2>
+                        <p class="info-card-subtitle">Alle 5 Mainspieler gleichzeitig verfügbar</p>
+                        <div id="fuenfq-content" class="overlap-content">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line short"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TEIL-ÜBERSCHNEIDUNGEN KARTE -->
+                <div class="info-card glass-panel" id="card-teil">
+                    <div class="info-card-icon secondary"><i class="fa-solid fa-people-arrows"></i></div>
+                    <div class="info-card-body">
+                        <h2>Teil-Überschneidungen</h2>
+                        <p class="info-card-subtitle">Mindestens 2 Spieler gleichzeitig verfügbar</p>
+                        <div id="teilueber-content" class="overlap-content">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line short"></div>
+                            <div class="skeleton-line"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== SPIELERZEITEN ANSICHT ===== -->
+        <section id="view-spielerzeiten" class="view">
+            <div class="dashboard-header">
+                <h2><i class="fa-solid fa-calendar-week"></i> Spielerzeiten</h2>
+                <p>Klicke auf einen Spieler und trage seine Verfügbarkeiten ein</p>
+            </div>
+            <!-- Spieler-Karten werden per JS generiert -->
+            <div class="player-grid" id="spielerzeiten-grid">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+            </div>
+        </section>
+
+        <!-- ===== SPIELERINFOS ANSICHT ===== -->
+        <section id="view-info" class="view">
+            <div class="dashboard-header">
+                <h2><i class="fa-solid fa-address-card"></i> Spielerinformationen</h2>
+                <p>Lanewichtungen und Mainhelden bearbeiten und ansehen</p>
+            </div>
+            <div class="player-grid" id="info-grid">
+                <!-- Wird per JS befüllt -->
+            </div>
+        </section>
+
+        <!-- ===== ROLLEN-VERTEILUNG (LINEUP-RECHNER) ===== -->
+        <section id="view-lineup" class="view">
+            <div class="dashboard-header">
+                <h2><i class="fa-solid fa-chess-knight"></i> Rollen-Verteilung & Team-Lineup</h2>
+                <p>Wähle 5 Spieler aus – das System berechnet in Echtzeit die optimale Lane-Zuweisung und Mainhelden</p>
+            </div>
+
+            <div class="glass-panel lineup-control-panel">
+                <div class="lineup-selector-header">
+                    <h3><i class="fa-solid fa-users"></i> Aktive Spieler auswählen (genau 5):</h3>
+                    <div class="lineup-quick-actions">
+                        <button id="btn-select-main5" class="btn-secondary-sm"><i class="fa-solid fa-star"></i> Main 5 wählen</button>
+                        <button id="btn-clear-selection" class="btn-secondary-sm"><i class="fa-solid fa-rotate-left"></i> Auswahl leeren</button>
+                    </div>
+                </div>
+                <div id="lineup-player-chips" class="player-chips-container">
+                    <!-- Dynamische Checkbox-Chips -->
+                </div>
+            </div>
+
+            <!-- Ergebnis der Zuweisung -->
+            <div id="lineup-result-panel" class="lineup-result-panel">
+                <div class="glass-panel full-width-msg">Bitte wähle 5 Spieler aus, um die optimale Aufstellung zu berechnen.</div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
