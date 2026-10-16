@@ -213,16 +213,29 @@ function parseOverlapText(rawText, isFiveQ) {
         if (lines.length === 0) return;
 
         // Tag-Name aus **Montag** extrahieren
-        const tagMatch = lines[0].match(/^\*\*(.+)\*\*$/);
-        const tagName  = tagMatch ? tagMatch[1] : lines[0];
-        const zeitLinien = lines.slice(1);
+        const tagMatch = lines[0].match(/^\*\*(.+?)\*\*$/);
+        let rawTagName = tagMatch ? tagMatch[1].trim() : lines[0].trim();
+
+        // Prüfen, ob bereits ein Datum in Klammern vorhanden ist (z.B. "Montag (19.10.)")
+        let displayTagName = rawTagName;
+        if (!/\(\d{1,2}\.\d{1,2}\.?\)/.test(rawTagName)) {
+            // Ermittle den passenden Wochentag aus TAGE
+            const lowerTag = rawTagName.toLowerCase();
+            const matchedTag = TAGE.find(t => lowerTag.includes(t.key) || lowerTag.includes(t.label.toLowerCase()));
+            if (matchedTag && tageDatum && tageDatum[matchedTag.key]) {
+                const dVal = tageDatum[matchedTag.key].trim();
+                if (dVal) {
+                    displayTagName = `${matchedTag.label} (${dVal})`;
+                }
+            }
+        }
 
         const iconClass = isFiveQ ? 'fa-trophy' : 'fa-users';
         let zeitBloeckeHtml = '';
 
         // Jede Zeile kann ein Zeitblock sein: "HH:MM - HH:MM (Spieler)"
         // Mehrere Blöcke pro Tag durch Leerzeilen getrennt (aber wir haben sie schon zeilenweise)
-        const bloecke = tagBlock.replace(/^\*\*.+\*\*\n/, '').split(/\n\n+/).map(b => b.trim()).filter(b => b);
+        const bloecke = tagBlock.replace(/^\*\*.+?\*\*\n/, '').split(/\n\n+/).map(b => b.trim()).filter(b => b);
 
         bloecke.forEach(block => {
             const match = block.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\s*\((.+)\)$/s);
@@ -261,7 +274,7 @@ function parseOverlapText(rawText, isFiveQ) {
         if (zeitBloeckeHtml) {
             html += `
                 <div class="tag-section">
-                    <div class="tag-section-header"><i class="fa-solid fa-calendar-day"></i> ${tagName}</div>
+                    <div class="tag-section-header"><i class="fa-solid fa-calendar-day"></i> ${displayTagName}</div>
                     <div class="overlap-blocks">${zeitBloeckeHtml}</div>
                 </div>
             `;
