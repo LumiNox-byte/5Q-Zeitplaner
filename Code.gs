@@ -27,6 +27,9 @@ function readTime(val) {
     }
   } else {
     s = val.toString().trim();
+    if (s.toLowerCase() === "xx:xx" || s.toLowerCase() === "xx.xx") {
+      return { time: "xx:xx", vielleicht: false };
+    }
     if (s.toLowerCase().indexOf("(vb)") !== -1 || s.indexOf("?") !== -1 || s.toLowerCase().indexOf("vielleicht") !== -1) {
       istVielleicht = true;
       s = s.replace(/\(vb\)/gi, "").replace(/\?/g, "").replace(/vielleicht/gi, "").trim();
@@ -115,6 +118,65 @@ function doGet(e) {
       }
     }
 
+    // === WOCHENTAGS-DATEN (DATUM PRO TAG) AUS DEM SHEET LESEN ===
+    // Im Zeitplaner stehen die Datumsangaben in Zeile 2 (Index 1)
+    // Spalten: C (2) = Montag, E (4) = Dienstag, G (6) = Mittwoch, I (8) = Donnerstag,
+    //          K (10) = Freitag, M (12) = Samstag, O (14) = Sonntag
+    var tageDatum = {};
+    var tageLabelsMitDatum = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+    var tageKeys = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"];
+    var tageCols = [2, 4, 6, 8, 10, 12, 14];
+
+    if (sheetZeitplan) {
+      try {
+        var headerCheckRange = sheetZeitplan.getRange(1, 1, Math.min(6, sheetZeitplan.getLastRow()), 18).getValues();
+        var headerCheckDisplay = sheetZeitplan.getRange(1, 1, Math.min(6, sheetZeitplan.getLastRow()), 18).getDisplayValues();
+
+        for (var tIdx = 0; tIdx < tageKeys.length; tIdx++) {
+          var cIdx = tageCols[tIdx];
+          var foundDate = "";
+
+          // Spezifisch Zeile 2 (Index 1) prüfen, dann Zeilen 0 bis 3
+          var rowsToCheck = [1, 0, 2, 3];
+          for (var ri = 0; ri < rowsToCheck.length; ri++) {
+            var rI = rowsToCheck[ri];
+            if (rI >= headerCheckRange.length) continue;
+
+            for (var subC = 0; subC <= 1; subC++) {
+              var col = cIdx + subC;
+              var rawCell = headerCheckRange[rI][col];
+              var dispCell = (headerCheckDisplay[rI][col] || "").toString().trim();
+
+              if (rawCell instanceof Date) {
+                foundDate = Utilities.formatDate(rawCell, Session.getScriptTimeZone(), "dd.MM.");
+                break;
+              } else if (dispCell) {
+                var dMatch = dispCell.match(/(\d{1,2}\.\d{1,2}\.?(\d{2,4})?)/);
+                if (dMatch) {
+                  var pDate = dMatch[1];
+                  // Falls z.B. "19.10.2026" -> als "19.10." formatieren
+                  var parts = pDate.split(".");
+                  if (parts.length >= 2) {
+                    foundDate = parts[0].padStart(2, "0") + "." + parts[1].padStart(2, "0") + ".";
+                  } else {
+                    foundDate = pDate;
+                  }
+                  break;
+                }
+              }
+            }
+            if (foundDate) break;
+          }
+
+          tageDatum[tageKeys[tIdx]] = foundDate;
+          var baseLabel = tageLabelsMitDatum[tIdx];
+          tageLabelsMitDatum[tIdx] = foundDate ? baseLabel + " (" + foundDate + ")" : baseLabel;
+        }
+      } catch (errDate) {
+        // Fallback: keine Datumsangabe
+      }
+    }
+
     // === ÜBERSCHNEIDUNGS-DATEN LESEN ===
     // Im Sheet stehen die Überschneidungen pro Tag in separaten Spalten:
     // Spalten C+D = Montag (Index 2+3), E+F = Dienstag, G+H = Mittwoch,
@@ -123,16 +185,13 @@ function doGet(e) {
     var ueberschneidungen = {};
     if (sheetZeitplan) {
       var allData = sheetZeitplan.getDataRange().getDisplayValues();
-      var tageLabels = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-      // Die Tagesspalten (Von-Spalte = Index, 0-basiert): C=2, E=4, G=6, I=8, K=10, M=12, O=14
-      var tageCols   = [2, 4, 6, 8, 10, 12, 14];
 
       for (var r = 0; r < allData.length; r++) {
         var cell0 = (allData[r][0] || "").toString().trim();
 
         if (cell0 === "Mögliche 5Q-Time" || cell0 === "Teil-Überschneidungen") {
           var combinedBlocks = [];
-          for (var ti = 0; ti < tageLabels.length; ti++) {
+          for (var ti = 0; ti < tageLabelsMitDatum.length; ti++) {
             // Der Zelleninhalt steht im merged-Block beginnend bei tageCols[ti]
             var tagWert = "";
             for (var ci = tageCols[ti]; ci < tageCols[ti] + 2; ci++) {
@@ -142,7 +201,7 @@ function doGet(e) {
             if (tagWert && tagWert !== "Keine Zeit") {
               // Zeilenumbrüche (<br> aus HTML-Export) normalisieren
               tagWert = tagWert.replace(/<br\s*\/?>/gi, "\n").replace(/\n\n+/g, "\n\n");
-              combinedBlocks.push("**" + tageLabels[ti] + "**\n" + tagWert);
+              combinedBlocks.push("**" + tageLabelsMitDatum[ti] + "**\n" + tagWert);
             }
           }
           var finalText = combinedBlocks.join("\n\n---\n\n");
@@ -221,7 +280,8 @@ function doGet(e) {
       status: "success",
       zeitplan: dataZeitplan,
       spielerInfo: dataSpielerInfo,
-      ueberschneidungen: ueberschneidungen
+      ueberschneidungen: ueberschneidungen,
+      tageDatum: tageDatum
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -471,10 +531,14 @@ function doPost(e) {
       if (!val) {
         cell.clearContent();
       } else {
-        if (istVielleicht && val.toLowerCase().indexOf("(vb)") === -1) {
-          val = val + " (vb)";
+        if (val.toLowerCase() === "xx:xx" || val.toLowerCase() === "xx.xx") {
+          cell.setValue("xx:xx");
+        } else {
+          if (istVielleicht && val.toLowerCase().indexOf("(vb)") === -1) {
+            val = val + " (vb)";
+          }
+          cell.setValue(val);
         }
-        cell.setValue(val);
       }
     }
 
@@ -568,8 +632,8 @@ function SPIELER_INFO(spielerName) {
       var t2_bis = (r + 1 < planData.length && planData[r+1][c + 1]) ? planData[r+1][c+1].toString().trim() : "";
 
       var dayTimeStr = "";
-      if (t1_von && t1_bis) dayTimeStr += t1_von + " - " + t1_bis;
-      if (t2_von && t2_bis) {
+      if (t1_von && t1_bis && t1_von.toLowerCase() !== "xx:xx") dayTimeStr += t1_von + " - " + t1_bis;
+      if (t2_von && t2_bis && t2_von.toLowerCase() !== "xx:xx") {
         if (dayTimeStr) dayTimeStr += ", ";
         dayTimeStr += t2_von + " - " + t2_bis;
       }

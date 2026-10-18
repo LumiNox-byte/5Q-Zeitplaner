@@ -45,8 +45,17 @@ const TAGE = [
 let teamData         = [];
 let spielerInfos     = [];
 let ueberschneidungen = {};
+let tageDatum        = {};
 let dataLoaded       = false;
 let selectedLineupPlayers = [];
+
+// Hilfsfunktion: Gibt die Anzeige-Beschriftung für einen Wochentag zurück (z. B. "Montag (16.10.)")
+function getDayFullLabel(tagKey) {
+    const t = TAGE.find(x => x.key === tagKey);
+    const base = t ? t.label : tagKey;
+    const d = tageDatum && tageDatum[tagKey] ? tageDatum[tagKey].trim() : '';
+    return d ? `${base} (${d})` : base;
+}
 
 // ============================================================================
 // NAVIGATION
@@ -95,7 +104,48 @@ async function loadData() {
             teamData          = result.zeitplan      || [];
             spielerInfos      = result.spielerInfo   || [];
             ueberschneidungen = result.ueberschneidungen || {};
-            dataLoaded        = true;
+            tageDatum = result.tageDatum || {};
+
+            // Falls das Sheet-Skript noch leere Werte liefert (hasAnyDate == false), Datumszeile direkt laden
+            const hasAnyDate = Object.values(tageDatum).some(d => d && d.trim().length > 0);
+            if (!hasAnyDate) {
+                try {
+                    const csvUrl = "https://docs.google.com/spreadsheets/d/1DHDYG4fihnxHTGgA4cQv15glAG0zNQqSy5hn3dPm2Xg/gviz/tq?tqx=out:csv&sheet=Zeitplaner";
+                    const csvResp = await fetch(csvUrl);
+                    if (csvResp.ok) {
+                        const csvText = await csvResp.text();
+                        const lines = csvText.split(/\r?\n/);
+                        const dateLine = lines.find(l => /\d{1,2}\.\d{1,2}\.\d{2,4}/.test(l));
+                        if (dateLine) {
+                            const dateMatches = dateLine.match(/\d{1,2}\.\d{1,2}\.?/g) || [];
+                            if (dateMatches.length >= 7) {
+                                TAGE.forEach((t, idx) => {
+                                    let dStr = dateMatches[idx].trim();
+                                    if (!dStr.endsWith('.')) dStr += '.';
+                                    tageDatum[t.key] = dStr;
+                                });
+                            }
+                        }
+                    }
+                } catch (eCsv) {
+                    console.warn("CSV Datums-Laden fehlgeschlagen:", eCsv);
+                }
+            }
+
+            // Statischer Fallback für den unwahrscheinlichen Fall kompletter Offline-/CORS-Blockade
+            if (!Object.values(tageDatum).some(d => d && d.trim().length > 0)) {
+                tageDatum = {
+                    montag: "19.10.",
+                    dienstag: "20.10.",
+                    mittwoch: "21.10.",
+                    donnerstag: "22.10.",
+                    freitag: "16.10.",
+                    samstag: "17.10.",
+                    sonntag: "18.10."
+                };
+            }
+
+            dataLoaded = true;
 
             syncStatus.innerHTML   = '<i class="fa-solid fa-check"></i> Verbunden';
             syncStatus.style.color = 'var(--success)';
@@ -163,16 +213,29 @@ function parseOverlapText(rawText, isFiveQ) {
         if (lines.length === 0) return;
 
         // Tag-Name aus **Montag** extrahieren
-        const tagMatch = lines[0].match(/^\*\*(.+)\*\*$/);
-        const tagName  = tagMatch ? tagMatch[1] : lines[0];
-        const zeitLinien = lines.slice(1);
+        const tagMatch = lines[0].match(/^\*\*(.+?)\*\*$/);
+        let rawTagName = tagMatch ? tagMatch[1].trim() : lines[0].trim();
+
+        // Prüfen, ob bereits ein Datum in Klammern vorhanden ist (z.B. "Montag (19.10.)")
+        let displayTagName = rawTagName;
+        if (!/\(\d{1,2}\.\d{1,2}\.?\)/.test(rawTagName)) {
+            // Ermittle den passenden Wochentag aus TAGE
+            const lowerTag = rawTagName.toLowerCase();
+            const matchedTag = TAGE.find(t => lowerTag.includes(t.key) || lowerTag.includes(t.label.toLowerCase()));
+            if (matchedTag && tageDatum && tageDatum[matchedTag.key]) {
+                const dVal = tageDatum[matchedTag.key].trim();
+                if (dVal) {
+                    displayTagName = `${matchedTag.label} (${dVal})`;
+                }
+            }
+        }
 
         const iconClass = isFiveQ ? 'fa-trophy' : 'fa-users';
         let zeitBloeckeHtml = '';
 
         // Jede Zeile kann ein Zeitblock sein: "HH:MM - HH:MM (Spieler)"
         // Mehrere Blöcke pro Tag durch Leerzeilen getrennt (aber wir haben sie schon zeilenweise)
-        const bloecke = tagBlock.replace(/^\*\*.+\*\*\n/, '').split(/\n\n+/).map(b => b.trim()).filter(b => b);
+        const bloecke = tagBlock.replace(/^\*\*.+?\*\*\n/, '').split(/\n\n+/).map(b => b.trim()).filter(b => b);
 
         bloecke.forEach(block => {
             const match = block.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\s*\((.+)\)$/s);
@@ -211,7 +274,7 @@ function parseOverlapText(rawText, isFiveQ) {
         if (zeitBloeckeHtml) {
             html += `
                 <div class="tag-section">
-                    <div class="tag-section-header"><i class="fa-solid fa-calendar-day"></i> ${tagName}</div>
+                    <div class="tag-section-header"><i class="fa-solid fa-calendar-day"></i> ${displayTagName}</div>
                     <div class="overlap-blocks">${zeitBloeckeHtml}</div>
                 </div>
             `;
@@ -256,6 +319,11 @@ function formatTimeInput(val) {
     if (!val && val !== 0) return '';
     const str = String(val).trim();
     if (!str || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined') return '';
+
+    // Falls "xx:xx" oder "xx.xx" oder "keine zeit"
+    if (str.toLowerCase() === 'xx:xx' || str.toLowerCase() === 'xx.xx' || str.toLowerCase() === 'keine zeit') {
+        return 'xx:xx';
+    }
 
     // Falls ISO-Datumsstring (z.B. "1899-12-30T14:00:00Z")
     const isoMatch = str.match(/T(\d{1,2}):(\d{2})/i);
@@ -327,32 +395,53 @@ function buildSpielerZeitenKarte(player) {
         const s2bis = formatTimeInput(rawS2.bis);
         const s2Vb  = !!rawS2.vielleicht;
 
-        const isDayEmpty = (!s1von && !s1bis && !s2von && !s2bis);
+        // Prüfen, ob an diesem Tag explizit "Keine Zeit" (xx:xx) eingetragen ist
+        const isDayNoTime = (s1von === 'xx:xx' || s1bis === 'xx:xx' || s2von === 'xx:xx' || s2bis === 'xx:xx');
+        const dayDate = tageDatum && tageDatum[tag.key] ? tageDatum[tag.key].trim() : '';
+        const dayDateSuffix = dayDate ? ` <span class="tag-date">(${dayDate})</span>` : '';
+
+        // Bei "Keine Zeit" wird type="text" mit "xx:xx" gerendert, damit statt "--:--" überall "xx:xx" steht
+        const s1vVal = isDayNoTime ? 'xx:xx' : s1von;
+        const s1bVal = isDayNoTime ? 'xx:xx' : s1bis;
+        const s2vVal = isDayNoTime ? 'xx:xx' : s2von;
+        const s2bVal = isDayNoTime ? 'xx:xx' : s2bis;
+
+        const s1vType = (s1vVal === 'xx:xx') ? 'text' : 'time';
+        const s1bType = (s1bVal === 'xx:xx') ? 'text' : 'time';
+        const s2vType = (s2vVal === 'xx:xx') ? 'text' : 'time';
+        const s2bType = (s2bVal === 'xx:xx') ? 'text' : 'time';
+
+        const s1vClass = (s1vVal === 'xx:xx') ? 'time-input no-time-val' : 'time-input';
+        const s1bClass = (s1bVal === 'xx:xx') ? 'time-input no-time-val' : 'time-input';
+        const s2vClass = (s2vVal === 'xx:xx') ? 'time-input no-time-val' : 'time-input';
+        const s2bClass = (s2bVal === 'xx:xx') ? 'time-input no-time-val' : 'time-input';
 
         tageHtml += `
-            <div class="tag-block ${isDayEmpty ? 'is-no-time' : ''}" data-day="${tag.key}">
+            <div class="tag-block ${isDayNoTime ? 'is-no-time' : ''}" data-day="${tag.key}">
                 <div class="tag-block-header">
-                    <div class="tag-label">${tag.label.substring(0, 2)}<span class="tag-label-full">${tag.label.substring(2)}</span></div>
+                    <div class="tag-label">
+                        ${tag.label.substring(0, 2)}<span class="tag-label-full">${tag.label.substring(2)}</span>${dayDateSuffix}
+                    </div>
                     <div class="tag-actions">
-                        <button type="button" class="btn-clear-day" title="Keine Zeit (Tag leeren)" onclick="clearDayTimes(this, '${tag.key}')">
+                        <button type="button" class="btn-clear-day ${isDayNoTime ? 'active' : ''}" title="${isDayNoTime ? 'Status aufheben' : 'Keine Zeit'}" onclick="toggleDayNoTime(this, '${tag.key}')">
                             <i class="fa-solid fa-ban"></i> Keine Zeit
                         </button>
                     </div>
                 </div>
                 <div class="slots">
                     <div class="slot">
-                        <input type="time" class="time-input" data-tag="${tag.key}" data-slot="1" data-type="von" value="${s1von}" placeholder="--:--">
+                        <input type="${s1vType}" class="${s1vClass}" data-tag="${tag.key}" data-slot="1" data-type="von" value="${s1vVal}" placeholder="--:--">
                         <span class="slot-sep">–</span>
-                        <input type="time" class="time-input" data-tag="${tag.key}" data-slot="1" data-type="bis" value="${s1bis}" placeholder="--:--">
-                        <button type="button" class="btn-vielleicht-toggle ${s1Vb ? 'active' : ''}" data-tag="${tag.key}" data-slot="1" onclick="toggleVielleicht(this)" title="Status: Vielleicht / Unsicher">
+                        <input type="${s1bType}" class="${s1bClass}" data-tag="${tag.key}" data-slot="1" data-type="bis" value="${s1bVal}" placeholder="--:--">
+                        <button type="button" class="btn-vielleicht-toggle ${s1Vb && !isDayNoTime ? 'active' : ''}" data-tag="${tag.key}" data-slot="1" onclick="toggleVielleicht(this)" title="Status: Vielleicht / Unsicher">
                             ? VB
                         </button>
                     </div>
                     <div class="slot">
-                        <input type="time" class="time-input" data-tag="${tag.key}" data-slot="2" data-type="von" value="${s2von}" placeholder="--:--">
+                        <input type="${s2vType}" class="${s2vClass}" data-tag="${tag.key}" data-slot="2" data-type="von" value="${s2vVal}" placeholder="--:--">
                         <span class="slot-sep">–</span>
-                        <input type="time" class="time-input" data-tag="${tag.key}" data-slot="2" data-type="bis" value="${s2bis}" placeholder="--:--">
-                        <button type="button" class="btn-vielleicht-toggle ${s2Vb ? 'active' : ''}" data-tag="${tag.key}" data-slot="2" onclick="toggleVielleicht(this)" title="Status: Vielleicht / Unsicher">
+                        <input type="${s2bType}" class="${s2bClass}" data-tag="${tag.key}" data-slot="2" data-type="bis" value="${s2bVal}" placeholder="--:--">
+                        <button type="button" class="btn-vielleicht-toggle ${s2Vb && !isDayNoTime ? 'active' : ''}" data-tag="${tag.key}" data-slot="2" onclick="toggleVielleicht(this)" title="Status: Vielleicht / Unsicher">
                             ? VB
                         </button>
                     </div>
@@ -383,19 +472,46 @@ function buildSpielerZeitenKarte(player) {
         <div class="save-msg hidden"></div>
     `;
 
-    // Explizit .value für type="time" Inputs setzen
+    // .value für Zeitinputs setzen & Event-Handler für Fokus & Änderungen
     card.querySelectorAll('.time-input').forEach(input => {
         const v = input.getAttribute('value');
         if (v) input.value = v;
 
+        // Wenn auf ein Feld mit "xx:xx" geklickt oder fokussiert wird:
+        // Tag-Zustand "Keine Zeit" auflösen und zu normalem Time-Picker umschalten
+        input.addEventListener('focus', () => {
+            if (input.classList.contains('no-time-val') || input.value === 'xx:xx') {
+                const dayBlock = input.closest('.tag-block');
+                const clearBtn = dayBlock ? dayBlock.querySelector('.btn-clear-day') : null;
+                if (clearBtn) clearBtn.classList.remove('active');
+                if (dayBlock) dayBlock.classList.remove('is-no-time');
+
+                if (dayBlock) {
+                    dayBlock.querySelectorAll('.time-input').forEach(inp => {
+                        if (inp.classList.contains('no-time-val') || inp.value === 'xx:xx') {
+                            inp.type = 'time';
+                            inp.value = '';
+                            inp.placeholder = '--:--';
+                            inp.classList.remove('no-time-val');
+                        }
+                    });
+                }
+            }
+        });
+
         input.addEventListener('change', () => {
             const dayBlock = input.closest('.tag-block');
-            const inputs = dayBlock.querySelectorAll('.time-input');
-            const hasAny = Array.from(inputs).some(inp => inp.value);
-            if (hasAny) {
+            const clearBtn = dayBlock ? dayBlock.querySelector('.btn-clear-day') : null;
+            const inputs = dayBlock ? dayBlock.querySelectorAll('.time-input') : [];
+            const hasTime = Array.from(inputs).some(inp => inp.value && inp.value !== 'xx:xx');
+            const isAllXx = Array.from(inputs).every(inp => inp.value === 'xx:xx');
+
+            if (hasTime) {
                 dayBlock.classList.remove('is-no-time');
-            } else {
+                if (clearBtn) clearBtn.classList.remove('active');
+            } else if (isAllXx) {
                 dayBlock.classList.add('is-no-time');
+                if (clearBtn) clearBtn.classList.add('active');
             }
         });
     });
@@ -407,18 +523,42 @@ function buildSpielerZeitenKarte(player) {
     return card;
 }
 
-// Schnelltaste "Keine Zeit" für einen Tag
-window.clearDayTimes = function(btnEl, tagKey) {
+// Schnelltaste / Toggle "Keine Zeit" für einen Tag
+window.toggleDayNoTime = function(btnEl, tagKey) {
     const dayBlock = btnEl.closest('.tag-block');
     if (!dayBlock) return;
-    dayBlock.querySelectorAll('.time-input').forEach(inp => {
-        inp.value = '';
-    });
-    dayBlock.querySelectorAll('.btn-vielleicht-toggle').forEach(vb => {
-        vb.classList.remove('active');
-    });
-    dayBlock.classList.add('is-no-time');
+
+    const isActive = btnEl.classList.contains('active');
+
+    if (isActive) {
+        // Zustand aufheben: Tag leeren und wieder als type="time" umschalten
+        btnEl.classList.remove('active');
+        btnEl.title = 'Keine Zeit';
+        dayBlock.classList.remove('is-no-time');
+        dayBlock.querySelectorAll('.time-input').forEach(inp => {
+            inp.type = 'time';
+            inp.value = '';
+            inp.placeholder = '--:--';
+            inp.classList.remove('no-time-val');
+        });
+    } else {
+        // "Keine Zeit" aktivieren: Felder auf "xx:xx" setzen, Button leuchtet kräftig!
+        btnEl.classList.add('active');
+        btnEl.title = 'Status aufheben';
+        dayBlock.classList.add('is-no-time');
+        dayBlock.classList.remove('has-vielleicht');
+        dayBlock.querySelectorAll('.btn-vielleicht-toggle').forEach(vb => {
+            vb.classList.remove('active');
+        });
+        dayBlock.querySelectorAll('.time-input').forEach(inp => {
+            inp.type = 'text';
+            inp.value = 'xx:xx';
+            inp.classList.add('no-time-val');
+        });
+    }
 };
+
+window.clearDayTimes = window.toggleDayNoTime;
 
 // Toggle für Status "Vielleicht"
 window.toggleVielleicht = function(btnEl) {
@@ -453,12 +593,14 @@ async function speichereSpielzeiten(player, card, btnEl) {
         const s2bis = card.querySelector(`input[data-tag="${tag.key}"][data-slot="2"][data-type="bis"]`)?.value || '';
         const s2vb  = card.querySelector(`.btn-vielleicht-toggle[data-tag="${tag.key}"][data-slot="2"]`)?.classList.contains('active') || false;
 
+        const isXx = (s1von === 'xx:xx');
+
         zeiten[tag.key] = {
             von: s1von,
             bis: s1bis,
-            vielleicht: s1vb,
-            slot1: { von: s1von, bis: s1bis, vielleicht: s1vb },
-            slot2: { von: s2von, bis: s2bis, vielleicht: s2vb }
+            vielleicht: isXx ? false : s1vb,
+            slot1: { von: s1von, bis: s1bis, vielleicht: isXx ? false : s1vb },
+            slot2: { von: s2von, bis: s2bis, vielleicht: isXx ? false : s2vb }
         };
     });
 
