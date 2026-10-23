@@ -45,9 +45,46 @@ const TAGE = [
 let teamData         = [];
 let spielerInfos     = [];
 let ueberschneidungen = {};
-let tageDatum        = {};
 let dataLoaded       = false;
 let selectedLineupPlayers = [];
+
+/**
+ * Berechnet dynamisch die Datumsangaben für die Wochentage (Mo-So).
+ * Regel des Sheets: "Vergangene Tage werden für Folgewoche genutzt".
+ */
+function getDynamischeTageDatum() {
+    const now = new Date();
+    const currentJsDay = now.getDay();
+    const currentDayOfWeek = currentJsDay === 0 ? 7 : currentJsDay; // 1 (Mo) bis 7 (So)
+
+    const tagKeysOrder = [
+        { key: 'montag',     dayNum: 1 },
+        { key: 'dienstag',   dayNum: 2 },
+        { key: 'mittwoch',   dayNum: 3 },
+        { key: 'donnerstag', dayNum: 4 },
+        { key: 'freitag',    dayNum: 5 },
+        { key: 'samstag',    dayNum: 6 },
+        { key: 'sonntag',    dayNum: 7 }
+    ];
+
+    const dynDatum = {};
+    tagKeysOrder.forEach(item => {
+        let diffDays = item.dayNum - currentDayOfWeek;
+        if (diffDays < 0) {
+            diffDays += 7;
+        }
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() + diffDays);
+
+        const d = String(targetDate.getDate()).padStart(2, '0');
+        const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+        dynDatum[item.key] = d + '.' + m + '.';
+    });
+
+    return dynDatum;
+}
+
+let tageDatum = getDynamischeTageDatum();
 
 // Hilfsfunktion: Gibt die Anzeige-Beschriftung für einen Wochentag zurück (z. B. "Montag (16.10.)")
 function getDayFullLabel(tagKey) {
@@ -132,17 +169,9 @@ async function loadData() {
                 }
             }
 
-            // Statischer Fallback für den unwahrscheinlichen Fall kompletter Offline-/CORS-Blockade
+            // Dynamischer Fallback: Immer tagesaktuell berechnen statt veralteter statischer Strings
             if (!Object.values(tageDatum).some(d => d && d.trim().length > 0)) {
-                tageDatum = {
-                    montag: "19.10.",
-                    dienstag: "20.10.",
-                    mittwoch: "21.10.",
-                    donnerstag: "22.10.",
-                    freitag: "16.10.",
-                    samstag: "17.10.",
-                    sonntag: "18.10."
-                };
+                tageDatum = getDynamischeTageDatum();
             }
 
             dataLoaded = true;
@@ -450,7 +479,8 @@ function buildSpielerZeitenKarte(player) {
         `;
     });
 
-    const badgeClass = getRoleBadgeClass(player.aufstellung);
+    const resolvedRole = player.aufstellung || getDefaultAufstellung(player.realName || player.dcName);
+    const badgeClass = getRoleBadgeClass(resolvedRole);
 
     card.innerHTML = `
         <div class="player-header">
@@ -458,7 +488,7 @@ function buildSpielerZeitenKarte(player) {
                 <h3>${player.realName || player.dcName}</h3>
                 <p>${player.dcName && player.realName && player.dcName.toLowerCase() !== player.realName.toLowerCase() ? '@' + player.dcName : ''}</p>
             </div>
-            <div class="role-badge ${badgeClass}">${player.aufstellung || 'Mainspieler'}</div>
+            <div class="role-badge ${badgeClass}">${resolvedRole}</div>
         </div>
         <div class="tage-grid">
             ${tageHtml}
@@ -650,7 +680,17 @@ function showCardMsg(el, text, type) {
 const LANES_ORDER = ['Roam', 'Midlane', 'Jungle', 'Explane', 'Goldlane'];
 
 // Hilfsfunktion: Ermittelt die Rangfolge/Priorität eines Spielers
-function getPlayerPriority(aufstellung) {
+function getDefaultAufstellung(name) {
+    const n = (name || '').toLowerCase().trim();
+    if (n === 'spieler 6') return 'Ersatzspieler 1';
+    if (n === 'spieler 7') return 'Ersatzspieler 2';
+    if (n === 'spieler 8') return 'Ersatzspieler 3';
+    if (n === 'spieler 9') return 'Ersatzspieler 4';
+    if (n === 'spieler 10') return 'Ersatzspieler 5';
+    if (n.startsWith('spieler ')) return 'Ersatzspieler';
+    return 'Mainspieler';
+}
+function getPlayerPriority(aufstellung, playerName) {
     const s = (aufstellung || '').toLowerCase().trim();
     if (s.includes('ersatzspieler 1') || s === 'ersatz 1') return 2;
     if (s.includes('ersatzspieler 2') || s === 'ersatz 2') return 3;
@@ -658,7 +698,17 @@ function getPlayerPriority(aufstellung) {
     if (s.includes('ersatzspieler 4') || s === 'ersatz 4') return 5;
     if (s.includes('ersatzspieler 5') || s === 'ersatz 5') return 6;
     if (s.includes('ersatz')) return 7;
-    return 1; // Mainspieler
+    if (s.includes('mainspieler') || s === 'main') return 1;
+
+    // Falls keine explizite Aufstellung vorhanden: Anhand von Name ableiten
+    const pn = (playerName || '').toLowerCase();
+    if (pn === 'spieler 7') return 3; // Ersatz 2
+    if (pn === 'spieler 8') return 4; // Ersatz 3
+    if (pn === 'spieler 9') return 5; // Ersatz 4
+    if (pn === 'spieler 10') return 6; // Ersatz 5
+    if (pn.startsWith('spieler ')) return 7;
+
+    return 1; // Standard: Mainspieler
 }
 
 // Hilfsfunktion: Gibt die passende CSS-Klasse für das Aufstellungs-Badge zurück
@@ -678,7 +728,7 @@ function getConsolidatedPlayerList() {
         const r = (p.realName || '').trim();
         const d = (p.dcName || '').trim();
         const rLower = r.toLowerCase();
-        if (rLower.startsWith('spieler ') || STOP_KEYWORDS.some(kw => rLower.includes(kw))) return;
+        if (STOP_KEYWORDS.some(kw => rLower.includes(kw))) return;
         if (!r && !d) return;
 
         const pReal = r.toLowerCase();
@@ -696,10 +746,11 @@ function getConsolidatedPlayerList() {
                    (iDc && (iDc === pDc || iDc === pReal));
         });
 
+        const defaultAufstellung = p.aufstellung || (matchedInfo && matchedInfo.aufstellung) || getDefaultAufstellung(r || d);
         cardsToRender.push({
             realName: r || (matchedInfo && matchedInfo.realName) || d,
-            dcName: d || (matchedInfo && matchedInfo.dcName) || r,
-            aufstellung: p.aufstellung || (matchedInfo && matchedInfo.aufstellung) || 'Mainspieler',
+            dcName: d || (matchedInfo && matchedInfo.dcName) || '',
+            aufstellung: defaultAufstellung,
             lanewichtung: (matchedInfo && matchedInfo.lanewichtung) || {},
             mainhelden: (matchedInfo && matchedInfo.mainhelden) || {}
         });
@@ -709,7 +760,7 @@ function getConsolidatedPlayerList() {
         const iReal = (info.realName || '').trim();
         const iDc   = (info.dcName || '').trim();
         const iKey  = (iDc || iReal).toLowerCase();
-        if (!iKey || iKey.startsWith('spieler ') || STOP_KEYWORDS.some(kw => iKey.includes(kw))) return;
+        if (!iKey || STOP_KEYWORDS.some(kw => iKey.includes(kw))) return;
 
         if (!seenKeys.has(iKey) && !(iReal && seenKeys.has(iReal.toLowerCase()))) {
             seenKeys.add(iKey);
@@ -726,8 +777,8 @@ function getConsolidatedPlayerList() {
 
     // Nach Priorität sortieren: Mainspieler zuerst, dann Ersatz 1 bis 5
     cardsToRender.sort((a, b) => {
-        const pa = getPlayerPriority(a.aufstellung);
-        const pb = getPlayerPriority(b.aufstellung);
+        const pa = getPlayerPriority(a.aufstellung, a.realName || a.dcName);
+        const pb = getPlayerPriority(b.aufstellung, b.realName || b.dcName);
         return pa - pb;
     });
 
@@ -1093,7 +1144,7 @@ function renderLineupSelector() {
         const pName = p.realName || p.dcName;
         const chip  = document.createElement('div');
         const isSelected = selectedLineupPlayers.includes(pName);
-        const pPriority = getPlayerPriority(p.aufstellung);
+        const pPriority = getPlayerPriority(p.aufstellung, pName);
         const tagSub = pPriority === 1 ? '' : `<small style="opacity:0.75; font-size:0.72rem; margin-left:0.25rem;">(Ersatz ${pPriority - 1})</small>`;
 
         chip.className = `player-chip ${isSelected ? 'selected' : ''}`;
