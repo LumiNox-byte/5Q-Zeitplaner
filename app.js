@@ -50,6 +50,8 @@ let selectedLineupPlayers     = [];
 let currentLineupAssignment   = {}; // Aktuelle Belegung: { 'Roam': 'Name', ... }
 let suggestedLineupAssignment = {}; // Berechneter optimaler Vorschlag
 let suggestedScore            = 0;  // Maximale Punktzahl des Vorschlags
+let topLineupSuggestions      = []; // Die 5 besten berechneten Kombinationen
+let activeSuggestionIndex     = 0;  // Index des aktuell aktiven Vorschlags (0 = #1)
 
 /**
  * Berechnet dynamisch die Datumsangaben für die Wochentage (Mo-So).
@@ -1184,6 +1186,8 @@ function renderLineupSelector() {
             currentLineupAssignment = {};
             suggestedLineupAssignment = {};
             suggestedScore = 0;
+            topLineupSuggestions = [];
+            activeSuggestionIndex = 0;
             renderLineupSelector();
             calculateOptimalLineup(selectedLineupPlayers);
         };
@@ -1193,6 +1197,7 @@ function renderLineupSelector() {
 }
 
 // Permutations-Algorithmus zur Zuweisung optimaler Lanes (Berechnet als Vorschlag)
+// Permutations-Algorithmus: Berechnet die Top 5 besten Kombinationen
 function calculateOptimalLineup(chosenNames) {
     if (!lineupResultEl) return;
 
@@ -1200,6 +1205,8 @@ function calculateOptimalLineup(chosenNames) {
         currentLineupAssignment = {};
         suggestedLineupAssignment = {};
         suggestedScore = 0;
+        topLineupSuggestions = [];
+        activeSuggestionIndex = 0;
         lineupResultEl.innerHTML = `
             <div class="glass-panel full-width-msg">
                 <i class="fa-solid fa-hand-pointer"></i> Bitte wähle noch ${5 - (chosenNames ? chosenNames.length : 0)} Spieler aus (aktuell: ${chosenNames ? chosenNames.length : 0}/5).
@@ -1228,9 +1235,7 @@ function calculateOptimalLineup(chosenNames) {
     }
 
     const lanePerms = permute(lanes);
-    let bestPerm = null;
-    let maxOverallEval = -99999999;
-    let bestRawScore = 0;
+    const allCombos = [];
 
     for (let p = 0; p < lanePerms.length; p++) {
         const currentLanes = lanePerms[p];
@@ -1256,24 +1261,30 @@ function calculateOptimalLineup(chosenNames) {
             else if (playerBestWeight >= 8) penalty += diff * diff * 10000;
             else                            penalty += diff * diff * 100;
 
-            currentMap[pName] = assignedLane;
+            currentMap[assignedLane] = pName;
         }
 
         const evaluation = (rawScore * 10000) - penalty;
-        if (evaluation > maxOverallEval) {
-            maxOverallEval = evaluation;
-            bestRawScore   = rawScore;
-            bestPerm       = currentMap;
-        }
+        allCombos.push({
+            rawScore: rawScore,
+            percent: Math.round((rawScore / 50) * 100),
+            evaluation: evaluation,
+            assignment: currentMap
+        });
     }
 
-    // Berechneten Vorschlag speichern: Lane -> Spieler
-    suggestedLineupAssignment = {};
-    lanes.forEach(lane => {
-        const assignedPlayerName = Object.keys(bestPerm).find(pName => bestPerm[pName] === lane) || '';
-        suggestedLineupAssignment[lane] = assignedPlayerName;
+    // Sortiere primär nach Team-Synergie (Punkte absteigend), sekundär nach evaluation (Strafe für unpassende Rollen)
+    allCombos.sort((a, b) => {
+        if (b.rawScore !== a.rawScore) return b.rawScore - a.rawScore;
+        return b.evaluation - a.evaluation;
     });
-    suggestedScore = bestRawScore;
+
+    // Die Top 5 besten Kombinationen erfassen
+    topLineupSuggestions = allCombos.slice(0, 5);
+    activeSuggestionIndex = 0;
+
+    suggestedLineupAssignment = Object.assign({}, topLineupSuggestions[0].assignment);
+    suggestedScore = topLineupSuggestions[0].rawScore;
 
     // Prüfen, ob die aktuelle manuelle Zuweisung noch alle 5 gewählten Spieler enthält
     const currentAssignedPlayers = Object.values(currentLineupAssignment);
@@ -1283,7 +1294,7 @@ function calculateOptimalLineup(chosenNames) {
         chosenNames.every(name => currentAssignedPlayers.includes(name))
     );
 
-    // Falls die Auswahl geändert wurde oder initial geladen wird: Vorschlag übernehmen
+    // Falls Auswahl geändert wurde oder ungültig ist: Besten Vorschlag (#1) übernehmen
     if (!isCurrentValid) {
         currentLineupAssignment = Object.assign({}, suggestedLineupAssignment);
     }
@@ -1291,7 +1302,7 @@ function calculateOptimalLineup(chosenNames) {
     renderLineupResult(playerMap);
 }
 
-// Rendert die Lane-Karten inklusive Dropdowns zum manuellen Anpassen
+// Rendert die Lane-Karten inklusive Dropdowns, Top-5-Vorschlägen & Aufstellungs-Speichern
 function renderLineupResult(playerMap) {
     if (!lineupResultEl) return;
     const lanes = LANES_ORDER;
@@ -1304,7 +1315,7 @@ function renderLineupResult(playerMap) {
         Goldlane: 'fa-solid fa-coins'
     };
 
-    // Berechnung der Team-Synergie für die aktuelle Belegung
+    // Aktuelle Synergie-Punkte berechnen
     let currentRawScore = 0;
     lanes.forEach(lane => {
         const pName = currentLineupAssignment[lane] || '';
@@ -1314,8 +1325,33 @@ function renderLineupResult(playerMap) {
     });
 
     const percent = Math.round((currentRawScore / 50) * 100);
-    const suggestedPercent = Math.round((suggestedScore / 50) * 100);
-    const isMatchingSuggestion = lanes.every(lane => currentLineupAssignment[lane] === suggestedLineupAssignment[lane]);
+
+    // Prüfen, welchem Vorschlag die aktuelle Aufstellung exakt entspricht (falls vorhanden)
+    let matchingSuggestionIdx = -1;
+    for (let si = 0; si < topLineupSuggestions.length; si++) {
+        const sMap = topLineupSuggestions[si].assignment;
+        if (lanes.every(lane => currentLineupAssignment[lane] === sMap[lane])) {
+            matchingSuggestionIdx = si;
+            break;
+        }
+    }
+
+    // Top-5-Vorschlag-Buttons generieren
+    let suggestionTabsHtml = '';
+    if (topLineupSuggestions.length > 0) {
+        suggestionTabsHtml = '<div class="lineup-top-suggestions-bar">';
+        suggestionTabsHtml += '<span class="suggestions-label"><i class="fa-solid fa-list-check"></i> Top 5 Vorschläge:</span>';
+        suggestionTabsHtml += '<div class="suggestions-pills-list">';
+        topLineupSuggestions.forEach((sug, idx) => {
+            const isTabActive = (matchingSuggestionIdx === idx);
+            suggestionTabsHtml += `
+                <button type="button" class="suggestion-tab-btn ${isTabActive ? 'active' : ''}" data-index="${idx}" title="Kombination #${idx + 1} mit ${sug.rawScore} Punkten anwenden">
+                    <span class="tab-badge">#${idx + 1}</span> ${sug.rawScore}/50 <small>(${sug.percent}%)</small>
+                </button>
+            `;
+        });
+        suggestionTabsHtml += '</div></div>';
+    }
 
     let lanesCardsHtml = '';
     lanes.forEach(lane => {
@@ -1339,7 +1375,7 @@ function renderLineupResult(playerMap) {
             const optWeight = (optP.lanewichtung && optP.lanewichtung[lane]) !== undefined ? optP.lanewichtung[lane] : 0;
             const isSelected = (optName === assignedPlayerName);
             const isOptSuggested = (optName === suggestedPlayerName);
-            const extraTag = isOptSuggested ? ' ⭐ [Vorschlag]' : '';
+            const extraTag = isOptSuggested ? ' ⭐ [Vorschlag 1]' : '';
             optionsHtml += `<option value="${optName}" ${isSelected ? 'selected' : ''}>${optName} (${optWeight}/10)${extraTag}</option>`;
         });
 
@@ -1362,13 +1398,13 @@ function renderLineupResult(playerMap) {
                         </select>
 
                         <div class="lineup-assignment-status">
-                            ${isCustom ? `
-                                <span class="status-custom" title="Berechneter Vorschlag war: ${suggestedPlayerName}">
-                                    <i class="fa-solid fa-arrow-right-arrow-left"></i> Manuell (Vorschlag: ${suggestedPlayerName})
+                            ${matchingSuggestionIdx >= 0 ? `
+                                <span class="status-suggested">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Vorschlag #${matchingSuggestionIdx + 1} aktiv
                                 </span>
                             ` : `
-                                <span class="status-suggested">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Optimaler Vorschlag
+                                <span class="status-custom" title="Manuelle Zuweisung aktiv">
+                                    <i class="fa-solid fa-arrow-right-arrow-left"></i> Eigene Anpassung
                                 </span>
                             `}
                             ${pObj.dcName && pObj.dcName !== assignedPlayerName ? `<small class="lineup-dc-name">@${pObj.dcName}</small>` : ''}
@@ -1393,28 +1429,26 @@ function renderLineupResult(playerMap) {
                     <i class="fa-solid fa-award" style="color:var(--accent-gold)"></i>
                     Team-Synergie: <span class="score-num">${currentRawScore} / 50</span> Punkte (${percent}%)
                 </div>
-                ${!isMatchingSuggestion ? `
-                    <div class="lineup-suggested-comparison">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Optimaler Vorschlag: <strong>${suggestedScore} / 50 (${suggestedPercent}%)</strong>
-                    </div>
-                ` : `
-                    <div class="lineup-suggested-comparison matched">
-                        <i class="fa-solid fa-circle-check"></i> Entspricht dem optimal berechneten Vorschlag
-                    </div>
-                `}
+                <div class="lineup-suggested-comparison ${matchingSuggestionIdx >= 0 ? 'matched' : ''}">
+                    ${matchingSuggestionIdx === 0 ? `
+                        <i class="fa-solid fa-circle-check"></i> Entspricht dem besten Vorschlag #1 (${suggestedScore}/50)
+                    ` : (matchingSuggestionIdx > 0 ? `
+                        <i class="fa-solid fa-circle-check"></i> Entspricht Vorschlag #${matchingSuggestionIdx + 1}
+                    ` : `
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Bester rechnerischer Vorschlag #1: <strong>${suggestedScore} / 50 (${Math.round(suggestedScore/50*100)}%)</strong>
+                    `)}
+                </div>
             </div>
             <div class="lineup-actions">
-                ${!isMatchingSuggestion ? `
-                    <button id="btn-reset-suggestion" class="btn-secondary-sm" title="Stellt die berechnete optimale Aufstellung wieder her">
-                        <i class="fa-solid fa-rotate-left"></i> Vorschlag wiederherstellen
-                    </button>
-                ` : `
-                    <span class="suggestion-status-pill">
-                        <i class="fa-solid fa-check"></i> Vorschlag aktiv
-                    </span>
-                `}
+                <button id="btn-save-lineup" class="btn-save" title="Diese 5 Spieler im Sheet als Mainspieler eintragen">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Aufstellung im Sheet speichern
+                </button>
             </div>
+            <div id="lineup-save-msg" class="save-msg hidden full-width-msg"></div>
         </div>
+
+        ${suggestionTabsHtml}
+
         <div class="lineup-lanes-grid">
             ${lanesCardsHtml}
         </div>
@@ -1441,13 +1475,92 @@ function renderLineupResult(playerMap) {
         });
     });
 
-    // Reset-Button: Vorschlag wiederherstellen
-    const btnReset = document.getElementById('btn-reset-suggestion');
-    if (btnReset) {
-        btnReset.addEventListener('click', () => {
-            currentLineupAssignment = Object.assign({}, suggestedLineupAssignment);
-            renderLineupResult(playerMap);
+    // Event-Listener für die Top-5-Vorschlag-Buttons
+    lineupResultEl.querySelectorAll('.suggestion-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index, 10);
+            if (!isNaN(idx) && topLineupSuggestions[idx]) {
+                activeSuggestionIndex = idx;
+                currentLineupAssignment = Object.assign({}, topLineupSuggestions[idx].assignment);
+                renderLineupResult(playerMap);
+            }
         });
+    });
+
+    // Event-Listener: Aufstellung im Sheet speichern
+    const btnSaveLineup = document.getElementById('btn-save-lineup');
+    if (btnSaveLineup) {
+        btnSaveLineup.addEventListener('click', () => speichereLineupAufstellung(btnSaveLineup));
+    }
+}
+
+// Speichert die ausgewählten 5 Spieler als Mainspieler und die restlichen als Ersatzspieler im Google Sheet
+async function speichereLineupAufstellung(btnEl) {
+    if (!selectedLineupPlayers || selectedLineupPlayers.length < 5) return;
+
+    const msgEl = document.getElementById('lineup-save-msg');
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichere im Sheet...';
+
+    const allPlayers = getConsolidatedPlayerList();
+    const aufstellungenPayload = {};
+
+    // 1. Die 5 aktiven Spieler werden zu "Mainspieler"
+    selectedLineupPlayers.forEach(pName => {
+        aufstellungenPayload[pName] = 'Mainspieler';
+    });
+
+    // 2. Alle anderen Spieler werden der Reihe nach zu Ersatzspieler 1 bis 5
+    let ersatzCount = 1;
+    allPlayers.forEach(p => {
+        const pName = p.realName || p.dcName;
+        if (!selectedLineupPlayers.includes(pName)) {
+            aufstellungenPayload[pName] = `Ersatzspieler ${ersatzCount}`;
+            ersatzCount++;
+        }
+    });
+
+    try {
+        const payload = {
+            action: "saveAllAufstellungen",
+            aufstellungen: aufstellungenPayload
+        };
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+        const result = await response.json();
+
+        if (result.status === "success") {
+            // Lokale Datenobjekte sofort aktualisieren
+            teamData.forEach(p => {
+                const pName = p.realName || p.dcName;
+                if (aufstellungenPayload[pName]) {
+                    p.aufstellung = aufstellungenPayload[pName];
+                }
+            });
+            spielerInfos.forEach(p => {
+                const pName = p.realName || p.dcName;
+                if (aufstellungenPayload[pName]) {
+                    p.aufstellung = aufstellungenPayload[pName];
+                }
+            });
+
+            showCardMsg(msgEl, '✅ Aufstellung erfolgreich im Google Sheet gespeichert!', 'success');
+            // Chips und Spielerzeiten mit den neuen Rollen-Badges aktualisieren
+            renderLineupSelector();
+            renderSpielzeiten();
+            renderSpielerInfo();
+        } else {
+            throw new Error(result.message || 'Fehler beim Speichern');
+        }
+    } catch (err) {
+        showCardMsg(msgEl, '❌ Fehler: ' + err.message, 'error');
+    } finally {
+        btnEl.disabled = false;
+        btnEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Aufstellung im Sheet speichern';
     }
 }
 

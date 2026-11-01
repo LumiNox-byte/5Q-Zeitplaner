@@ -404,6 +404,52 @@ function doPost(e) {
     }
 
     // ========================================================================
+    // AKTION 0.5: GESAMTE AUFSTELLUNG (MAIN 5 & ERSATZ) SPEICHERN
+    // ========================================================================
+    if (requestData.action === "saveAllAufstellungen") {
+      var aufstellungen = requestData.aufstellungen || {}; // { "Name": "Mainspieler", ... }
+      var sheetZ = ss.getSheetByName("Zeitplaner");
+
+      if (!sheetZ) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Tabellenblatt 'Zeitplaner' nicht gefunden." })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var lz = sheetZ.getLastRow();
+      if (lz >= 9) {
+        var numRows = lz - 8;
+        var zVals = sheetZ.getRange(9, 1, numRows, 2).getValues();
+
+        for (var zi = 0; zi < zVals.length; zi++) {
+          var zR = (zVals[zi][0] || "").toString().trim();
+          var zD = (zVals[zi][1] || "").toString().trim();
+          if (!zR && !zD) continue;
+
+          // Prüfe, ob für diesen Spieler eine neue Aufstellung übergeben wurde
+          var newRole = aufstellungen[zR] || aufstellungen[zD];
+          if (!newRole) {
+            var zRLower = zR.toLowerCase();
+            var zDLower = zD.toLowerCase();
+            for (var aKey in aufstellungen) {
+              if (aKey.toLowerCase() === zRLower || aKey.toLowerCase() === zDLower) {
+                newRole = aufstellungen[aKey];
+                break;
+              }
+            }
+          }
+
+          if (newRole) {
+            sheetZ.getRange(9 + zi, 19).setValue(newRole); // Spalte S (Index 19, 1-basiert)
+          }
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Aufstellung erfolgreich im Sheet gespeichert!"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ========================================================================
     // AKTION 1: SPIELERINFORMATIONEN (LANES & HELDEN) SPEICHERN
     // ========================================================================
     if (requestData.action === "saveSpielerInfo") {
