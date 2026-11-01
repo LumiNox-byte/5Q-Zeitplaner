@@ -1021,6 +1021,12 @@ nav button.active {
     padding: 1rem 1.2rem;
 }
 
+.lineup-score-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 .lineup-score-tag {
     font-size: 1.1rem;
     font-weight: 800;
@@ -1032,6 +1038,34 @@ nav button.active {
 .lineup-score-tag .score-num {
     color: var(--accent-gold);
     font-size: 1.3rem;
+}
+
+.lineup-suggested-comparison {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.lineup-suggested-comparison strong {
+    color: var(--accent-gold);
+}
+
+.lineup-suggested-comparison.matched {
+    color: var(--success);
+}
+
+.suggestion-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .lineup-lanes-grid {
@@ -1046,7 +1080,7 @@ nav button.active {
     border-radius: 12px;
     padding: 1rem;
     backdrop-filter: blur(12px);
-    transition: transform 0.2s, border-color 0.2s;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -1055,6 +1089,11 @@ nav button.active {
 .lineup-lane-card:hover {
     transform: translateY(-2px);
     border-color: var(--primary);
+}
+
+.lineup-lane-card.is-custom-assignment {
+    border-color: rgba(56, 189, 248, 0.55);
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.1);
 }
 
 .lineup-lane-header {
@@ -1079,14 +1118,96 @@ nav button.active {
     margin-bottom: 0.6rem;
 }
 
-.lineup-player-assigned h4 {
-    font-size: 1.15rem;
-    color: var(--text-main);
+.lineup-select-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 0.2rem;
 }
 
-.lineup-player-assigned p {
-    font-size: 0.78rem;
+.lineup-player-select {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.45rem 0.6rem;
+    width: 100%;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    font-family: inherit;
+    margin-bottom: 0.35rem;
+}
+
+.lineup-player-select:hover {
+    border-color: var(--primary);
+}
+
+.lineup-player-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.35);
+}
+
+.lineup-player-select option {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 0.4rem;
+}
+
+.lineup-assignment-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+}
+
+.status-suggested {
+    color: #a78bfa;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.status-custom {
+    color: #38bdf8;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(56, 189, 248, 0.12);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.lineup-dc-name {
     color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.weight-badge.weight-high {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.weight-badge.weight-med {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.weight-badge.weight-low {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
 .lineup-lane-heroes-box {

@@ -45,9 +45,49 @@ const TAGE = [
 let teamData         = [];
 let spielerInfos     = [];
 let ueberschneidungen = {};
-let tageDatum        = {};
 let dataLoaded       = false;
-let selectedLineupPlayers = [];
+let selectedLineupPlayers     = [];
+let currentLineupAssignment   = {}; // Aktuelle Belegung: { 'Roam': 'Name', ... }
+let suggestedLineupAssignment = {}; // Berechneter optimaler Vorschlag
+let suggestedScore            = 0;  // Maximale Punktzahl des Vorschlags
+
+/**
+ * Berechnet dynamisch die Datumsangaben für die Wochentage (Mo-So).
+ * Regel des Sheets: "Vergangene Tage werden für Folgewoche genutzt".
+ */
+function getDynamischeTageDatum() {
+    const now = new Date();
+    const currentJsDay = now.getDay();
+    const currentDayOfWeek = currentJsDay === 0 ? 7 : currentJsDay; // 1 (Mo) bis 7 (So)
+
+    const tagKeysOrder = [
+        { key: 'montag',     dayNum: 1 },
+        { key: 'dienstag',   dayNum: 2 },
+        { key: 'mittwoch',   dayNum: 3 },
+        { key: 'donnerstag', dayNum: 4 },
+        { key: 'freitag',    dayNum: 5 },
+        { key: 'samstag',    dayNum: 6 },
+        { key: 'sonntag',    dayNum: 7 }
+    ];
+
+    const dynDatum = {};
+    tagKeysOrder.forEach(item => {
+        let diffDays = item.dayNum - currentDayOfWeek;
+        if (diffDays < 0) {
+            diffDays += 7;
+        }
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() + diffDays);
+
+        const d = String(targetDate.getDate()).padStart(2, '0');
+        const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+        dynDatum[item.key] = d + '.' + m + '.';
+    });
+
+    return dynDatum;
+}
+
+let tageDatum = getDynamischeTageDatum();
 
 // Hilfsfunktion: Gibt die Anzeige-Beschriftung für einen Wochentag zurück (z. B. "Montag (16.10.)")
 function getDayFullLabel(tagKey) {
@@ -132,17 +172,9 @@ async function loadData() {
                 }
             }
 
-            // Statischer Fallback für den unwahrscheinlichen Fall kompletter Offline-/CORS-Blockade
+            // Dynamischer Fallback: Immer tagesaktuell berechnen statt veralteter statischer Strings
             if (!Object.values(tageDatum).some(d => d && d.trim().length > 0)) {
-                tageDatum = {
-                    montag: "19.10.",
-                    dienstag: "20.10.",
-                    mittwoch: "21.10.",
-                    donnerstag: "22.10.",
-                    freitag: "16.10.",
-                    samstag: "17.10.",
-                    sonntag: "18.10."
-                };
+                tageDatum = getDynamischeTageDatum();
             }
 
             dataLoaded = true;
@@ -450,7 +482,8 @@ function buildSpielerZeitenKarte(player) {
         `;
     });
 
-    const badgeClass = getRoleBadgeClass(player.aufstellung);
+    const resolvedRole = player.aufstellung || getDefaultAufstellung(player.realName || player.dcName);
+    const badgeClass = getRoleBadgeClass(resolvedRole);
 
     card.innerHTML = `
         <div class="player-header">
@@ -458,7 +491,7 @@ function buildSpielerZeitenKarte(player) {
                 <h3>${player.realName || player.dcName}</h3>
                 <p>${player.dcName && player.realName && player.dcName.toLowerCase() !== player.realName.toLowerCase() ? '@' + player.dcName : ''}</p>
             </div>
-            <div class="role-badge ${badgeClass}">${player.aufstellung || 'Mainspieler'}</div>
+            <div class="role-badge ${badgeClass}">${resolvedRole}</div>
         </div>
         <div class="tage-grid">
             ${tageHtml}
@@ -650,7 +683,17 @@ function showCardMsg(el, text, type) {
 const LANES_ORDER = ['Roam', 'Midlane', 'Jungle', 'Explane', 'Goldlane'];
 
 // Hilfsfunktion: Ermittelt die Rangfolge/Priorität eines Spielers
-function getPlayerPriority(aufstellung) {
+function getDefaultAufstellung(name) {
+    const n = (name || '').toLowerCase().trim();
+    if (n === 'spieler 6') return 'Ersatzspieler 1';
+    if (n === 'spieler 7') return 'Ersatzspieler 2';
+    if (n === 'spieler 8') return 'Ersatzspieler 3';
+    if (n === 'spieler 9') return 'Ersatzspieler 4';
+    if (n === 'spieler 10') return 'Ersatzspieler 5';
+    if (n.startsWith('spieler ')) return 'Ersatzspieler';
+    return 'Mainspieler';
+}
+function getPlayerPriority(aufstellung, playerName) {
     const s = (aufstellung || '').toLowerCase().trim();
     if (s.includes('ersatzspieler 1') || s === 'ersatz 1') return 2;
     if (s.includes('ersatzspieler 2') || s === 'ersatz 2') return 3;
@@ -658,7 +701,17 @@ function getPlayerPriority(aufstellung) {
     if (s.includes('ersatzspieler 4') || s === 'ersatz 4') return 5;
     if (s.includes('ersatzspieler 5') || s === 'ersatz 5') return 6;
     if (s.includes('ersatz')) return 7;
-    return 1; // Mainspieler
+    if (s.includes('mainspieler') || s === 'main') return 1;
+
+    // Falls keine explizite Aufstellung vorhanden: Anhand von Name ableiten
+    const pn = (playerName || '').toLowerCase();
+    if (pn === 'spieler 7') return 3; // Ersatz 2
+    if (pn === 'spieler 8') return 4; // Ersatz 3
+    if (pn === 'spieler 9') return 5; // Ersatz 4
+    if (pn === 'spieler 10') return 6; // Ersatz 5
+    if (pn.startsWith('spieler ')) return 7;
+
+    return 1; // Standard: Mainspieler
 }
 
 // Hilfsfunktion: Gibt die passende CSS-Klasse für das Aufstellungs-Badge zurück
@@ -678,7 +731,7 @@ function getConsolidatedPlayerList() {
         const r = (p.realName || '').trim();
         const d = (p.dcName || '').trim();
         const rLower = r.toLowerCase();
-        if (rLower.startsWith('spieler ') || STOP_KEYWORDS.some(kw => rLower.includes(kw))) return;
+        if (STOP_KEYWORDS.some(kw => rLower.includes(kw))) return;
         if (!r && !d) return;
 
         const pReal = r.toLowerCase();
@@ -696,10 +749,11 @@ function getConsolidatedPlayerList() {
                    (iDc && (iDc === pDc || iDc === pReal));
         });
 
+        const defaultAufstellung = p.aufstellung || (matchedInfo && matchedInfo.aufstellung) || getDefaultAufstellung(r || d);
         cardsToRender.push({
             realName: r || (matchedInfo && matchedInfo.realName) || d,
-            dcName: d || (matchedInfo && matchedInfo.dcName) || r,
-            aufstellung: p.aufstellung || (matchedInfo && matchedInfo.aufstellung) || 'Mainspieler',
+            dcName: d || (matchedInfo && matchedInfo.dcName) || '',
+            aufstellung: defaultAufstellung,
             lanewichtung: (matchedInfo && matchedInfo.lanewichtung) || {},
             mainhelden: (matchedInfo && matchedInfo.mainhelden) || {}
         });
@@ -709,7 +763,7 @@ function getConsolidatedPlayerList() {
         const iReal = (info.realName || '').trim();
         const iDc   = (info.dcName || '').trim();
         const iKey  = (iDc || iReal).toLowerCase();
-        if (!iKey || iKey.startsWith('spieler ') || STOP_KEYWORDS.some(kw => iKey.includes(kw))) return;
+        if (!iKey || STOP_KEYWORDS.some(kw => iKey.includes(kw))) return;
 
         if (!seenKeys.has(iKey) && !(iReal && seenKeys.has(iReal.toLowerCase()))) {
             seenKeys.add(iKey);
@@ -726,8 +780,8 @@ function getConsolidatedPlayerList() {
 
     // Nach Priorität sortieren: Mainspieler zuerst, dann Ersatz 1 bis 5
     cardsToRender.sort((a, b) => {
-        const pa = getPlayerPriority(a.aufstellung);
-        const pb = getPlayerPriority(b.aufstellung);
+        const pa = getPlayerPriority(a.aufstellung, a.realName || a.dcName);
+        const pb = getPlayerPriority(b.aufstellung, b.realName || b.dcName);
         return pa - pb;
     });
 
@@ -1093,7 +1147,7 @@ function renderLineupSelector() {
         const pName = p.realName || p.dcName;
         const chip  = document.createElement('div');
         const isSelected = selectedLineupPlayers.includes(pName);
-        const pPriority = getPlayerPriority(p.aufstellung);
+        const pPriority = getPlayerPriority(p.aufstellung, pName);
         const tagSub = pPriority === 1 ? '' : `<small style="opacity:0.75; font-size:0.72rem; margin-left:0.25rem;">(Ersatz ${pPriority - 1})</small>`;
 
         chip.className = `player-chip ${isSelected ? 'selected' : ''}`;
@@ -1127,6 +1181,9 @@ function renderLineupSelector() {
     if (btnClearSelect) {
         btnClearSelect.onclick = () => {
             selectedLineupPlayers = [];
+            currentLineupAssignment = {};
+            suggestedLineupAssignment = {};
+            suggestedScore = 0;
             renderLineupSelector();
             calculateOptimalLineup(selectedLineupPlayers);
         };
@@ -1135,14 +1192,17 @@ function renderLineupSelector() {
     calculateOptimalLineup(selectedLineupPlayers);
 }
 
-// Permutations-Algorithmus zur Zuweisung optimaler Lanes
+// Permutations-Algorithmus zur Zuweisung optimaler Lanes (Berechnet als Vorschlag)
 function calculateOptimalLineup(chosenNames) {
     if (!lineupResultEl) return;
 
     if (!chosenNames || chosenNames.length < 5) {
+        currentLineupAssignment = {};
+        suggestedLineupAssignment = {};
+        suggestedScore = 0;
         lineupResultEl.innerHTML = `
             <div class="glass-panel full-width-msg">
-                <i class="fa-solid fa-hand-pointer"></i> Bitte wähle noch ${5 - chosenNames.length} Spieler aus (aktuell: ${chosenNames.length}/5).
+                <i class="fa-solid fa-hand-pointer"></i> Bitte wähle noch ${5 - (chosenNames ? chosenNames.length : 0)} Spieler aus (aktuell: ${chosenNames ? chosenNames.length : 0}/5).
             </div>
         `;
         return;
@@ -1155,7 +1215,7 @@ function calculateOptimalLineup(chosenNames) {
         playerMap[(p.dcName || '').toLowerCase()] = p;
     });
 
-    const lanes = ['Roam', 'Midlane', 'Jungle', 'Explane', 'Goldlane'];
+    const lanes = LANES_ORDER; // ['Roam', 'Midlane', 'Jungle', 'Explane', 'Goldlane']
 
     function permute(arr) {
         if (arr.length === 0) return [[]];
@@ -1207,7 +1267,35 @@ function calculateOptimalLineup(chosenNames) {
         }
     }
 
-    // Lane-Icons
+    // Berechneten Vorschlag speichern: Lane -> Spieler
+    suggestedLineupAssignment = {};
+    lanes.forEach(lane => {
+        const assignedPlayerName = Object.keys(bestPerm).find(pName => bestPerm[pName] === lane) || '';
+        suggestedLineupAssignment[lane] = assignedPlayerName;
+    });
+    suggestedScore = bestRawScore;
+
+    // Prüfen, ob die aktuelle manuelle Zuweisung noch alle 5 gewählten Spieler enthält
+    const currentAssignedPlayers = Object.values(currentLineupAssignment);
+    const isCurrentValid = (
+        currentAssignedPlayers.length === 5 &&
+        lanes.every(l => currentLineupAssignment[l]) &&
+        chosenNames.every(name => currentAssignedPlayers.includes(name))
+    );
+
+    // Falls die Auswahl geändert wurde oder initial geladen wird: Vorschlag übernehmen
+    if (!isCurrentValid) {
+        currentLineupAssignment = Object.assign({}, suggestedLineupAssignment);
+    }
+
+    renderLineupResult(playerMap);
+}
+
+// Rendert die Lane-Karten inklusive Dropdowns zum manuellen Anpassen
+function renderLineupResult(playerMap) {
+    if (!lineupResultEl) return;
+    const lanes = LANES_ORDER;
+
     const LANE_ICONS = {
         Roam:     'fa-solid fa-shield',
         Midlane:  'fa-solid fa-wand-magic-sparkles',
@@ -1216,30 +1304,80 @@ function calculateOptimalLineup(chosenNames) {
         Goldlane: 'fa-solid fa-coins'
     };
 
+    // Berechnung der Team-Synergie für die aktuelle Belegung
+    let currentRawScore = 0;
+    lanes.forEach(lane => {
+        const pName = currentLineupAssignment[lane] || '';
+        const pObj = playerMap[pName.toLowerCase()] || {};
+        const weight = (pObj.lanewichtung && pObj.lanewichtung[lane]) !== undefined ? pObj.lanewichtung[lane] : 0;
+        currentRawScore += weight;
+    });
+
+    const percent = Math.round((currentRawScore / 50) * 100);
+    const suggestedPercent = Math.round((suggestedScore / 50) * 100);
+    const isMatchingSuggestion = lanes.every(lane => currentLineupAssignment[lane] === suggestedLineupAssignment[lane]);
+
     let lanesCardsHtml = '';
     lanes.forEach(lane => {
-        // Finde den Spieler für diese Lane
-        const assignedPlayerName = Object.keys(bestPerm).find(pName => bestPerm[pName] === lane);
-        const pObj = playerMap[assignedPlayerName.toLowerCase()] || { lanewichtung: {}, mainhelden: {} };
-        const weight = (pObj.lanewichtung && pObj.lanewichtung[lane]) || 0;
-        const heroes = (pObj.mainhelden && pObj.mainhelden[lane]) || [];
+        const assignedPlayerName = currentLineupAssignment[lane] || '';
+        const suggestedPlayerName = suggestedLineupAssignment[lane] || '';
+        const isCustom = (assignedPlayerName !== suggestedPlayerName);
 
+        const pObj = playerMap[assignedPlayerName.toLowerCase()] || { lanewichtung: {}, mainhelden: {} };
+        const weight = (pObj.lanewichtung && pObj.lanewichtung[lane]) !== undefined ? pObj.lanewichtung[lane] : 0;
+        const heroes = (pObj.mainhelden && pObj.mainhelden[lane]) || [];
         const heroesPills = heroes.filter(h => h).map(h => `<span class="hero-tag">${h}</span>`).join('') || '<span style="color:var(--text-muted); font-size:0.75rem;">Keine Helden hinterlegt</span>';
 
+        let weightBadgeClass = 'weight-high';
+        if (weight <= 3) weightBadgeClass = 'weight-low';
+        else if (weight <= 6) weightBadgeClass = 'weight-med';
+
+        // Dropdown-Optionen mit den 5 ausgewählten Spielern
+        let optionsHtml = '';
+        selectedLineupPlayers.forEach(optName => {
+            const optP = playerMap[optName.toLowerCase()] || {};
+            const optWeight = (optP.lanewichtung && optP.lanewichtung[lane]) !== undefined ? optP.lanewichtung[lane] : 0;
+            const isSelected = (optName === assignedPlayerName);
+            const isOptSuggested = (optName === suggestedPlayerName);
+            const extraTag = isOptSuggested ? ' ⭐ [Vorschlag]' : '';
+            optionsHtml += `<option value="${optName}" ${isSelected ? 'selected' : ''}>${optName} (${optWeight}/10)${extraTag}</option>`;
+        });
+
         lanesCardsHtml += `
-            <div class="lineup-lane-card">
+            <div class="lineup-lane-card ${isCustom ? 'is-custom-assignment' : ''}" data-lane="${lane}">
                 <div>
                     <div class="lineup-lane-header">
-                        <div class="lineup-lane-name"><i class="${LANE_ICONS[lane] || 'fa-solid fa-gamepad'}"></i> ${lane}</div>
-                        <span class="weight-badge">${weight}/10</span>
+                        <div class="lineup-lane-name">
+                            <i class="${LANE_ICONS[lane] || 'fa-solid fa-gamepad'}"></i> ${lane}
+                        </div>
+                        <span class="weight-badge ${weightBadgeClass}">${weight}/10</span>
                     </div>
+
                     <div class="lineup-player-assigned">
-                        <h4>${assignedPlayerName}</h4>
-                        <p>${pObj.dcName && pObj.dcName !== assignedPlayerName ? '@' + pObj.dcName : 'Lane-Main'}</p>
+                        <label class="lineup-select-label">
+                            <i class="fa-solid fa-user-tag"></i> Spieler wählen:
+                        </label>
+                        <select class="lineup-player-select" data-lane="${lane}" title="Spieler für ${lane} anpassen">
+                            ${optionsHtml}
+                        </select>
+
+                        <div class="lineup-assignment-status">
+                            ${isCustom ? `
+                                <span class="status-custom" title="Berechneter Vorschlag war: ${suggestedPlayerName}">
+                                    <i class="fa-solid fa-arrow-right-arrow-left"></i> Manuell (Vorschlag: ${suggestedPlayerName})
+                                </span>
+                            ` : `
+                                <span class="status-suggested">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Optimaler Vorschlag
+                                </span>
+                            `}
+                            ${pObj.dcName && pObj.dcName !== assignedPlayerName ? `<small class="lineup-dc-name">@${pObj.dcName}</small>` : ''}
+                        </div>
                     </div>
                 </div>
+
                 <div class="lineup-lane-heroes-box">
-                    <small><i class="fa-solid fa-khanda"></i> 4 Haupthelden</small>
+                    <small><i class="fa-solid fa-khanda"></i> 4 Haupthelden (${lane})</small>
                     <div class="lineup-heroes-tags">
                         ${heroesPills}
                     </div>
@@ -1248,22 +1386,69 @@ function calculateOptimalLineup(chosenNames) {
         `;
     });
 
-    const percent = Math.round((bestRawScore / 50) * 100);
-
     lineupResultEl.innerHTML = `
         <div class="glass-panel lineup-summary-bar">
-            <div class="lineup-score-tag">
-                <i class="fa-solid fa-award" style="color:var(--accent-gold)"></i>
-                Team-Synergie: <span class="score-num">${bestRawScore} / 50</span> Punkte (${percent}%)
+            <div class="lineup-score-container">
+                <div class="lineup-score-tag">
+                    <i class="fa-solid fa-award" style="color:var(--accent-gold)"></i>
+                    Team-Synergie: <span class="score-num">${currentRawScore} / 50</span> Punkte (${percent}%)
+                </div>
+                ${!isMatchingSuggestion ? `
+                    <div class="lineup-suggested-comparison">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Optimaler Vorschlag: <strong>${suggestedScore} / 50 (${suggestedPercent}%)</strong>
+                    </div>
+                ` : `
+                    <div class="lineup-suggested-comparison matched">
+                        <i class="fa-solid fa-circle-check"></i> Entspricht dem optimal berechneten Vorschlag
+                    </div>
+                `}
             </div>
-            <div style="font-size:0.85rem; color:var(--text-muted);">
-                Optimale Rollenaufteilung ohne Lane-Konflikte berechnet
+            <div class="lineup-actions">
+                ${!isMatchingSuggestion ? `
+                    <button id="btn-reset-suggestion" class="btn-secondary-sm" title="Stellt die berechnete optimale Aufstellung wieder her">
+                        <i class="fa-solid fa-rotate-left"></i> Vorschlag wiederherstellen
+                    </button>
+                ` : `
+                    <span class="suggestion-status-pill">
+                        <i class="fa-solid fa-check"></i> Vorschlag aktiv
+                    </span>
+                `}
             </div>
         </div>
         <div class="lineup-lanes-grid">
             ${lanesCardsHtml}
         </div>
     `;
+
+    // Dropdown Event-Listener (Automatischer Tausch zwischen den Lanes)
+    lineupResultEl.querySelectorAll('.lineup-player-select').forEach(selectEl => {
+        selectEl.addEventListener('change', (e) => {
+            const targetLane = e.target.dataset.lane;
+            const newPlayer = e.target.value;
+            const oldPlayer = currentLineupAssignment[targetLane];
+
+            if (newPlayer === oldPlayer) return;
+
+            // Finde die Lane, auf der der gewählte Spieler bisher eingeteilt war
+            const sourceLane = Object.keys(currentLineupAssignment).find(l => currentLineupAssignment[l] === newPlayer);
+            if (sourceLane && sourceLane !== targetLane) {
+                // Tausche die Spieler zwischen den beiden Lanes
+                currentLineupAssignment[sourceLane] = oldPlayer;
+            }
+            currentLineupAssignment[targetLane] = newPlayer;
+
+            renderLineupResult(playerMap);
+        });
+    });
+
+    // Reset-Button: Vorschlag wiederherstellen
+    const btnReset = document.getElementById('btn-reset-suggestion');
+    if (btnReset) {
+        btnReset.addEventListener('click', () => {
+            currentLineupAssignment = Object.assign({}, suggestedLineupAssignment);
+            renderLineupResult(playerMap);
+        });
+    }
 }
 
 // ============================================================================

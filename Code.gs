@@ -173,7 +173,30 @@ function doGet(e) {
           tageLabelsMitDatum[tIdx] = foundDate ? baseLabel + " (" + foundDate + ")" : baseLabel;
         }
       } catch (errDate) {
-        // Fallback: keine Datumsangabe
+        // Fallback
+      }
+
+      // Falls Datumsangaben im Sheet leer waren, dynamisch nach Sheet-Regel berechnen
+      var hasAnyDate = false;
+      for (var dk in tageDatum) { if (tageDatum[dk]) { hasAnyDate = true; break; } }
+      if (!hasAnyDate) {
+        var now = new Date();
+        var currentJsDay = now.getDay();
+        var currentDayOfWeek = currentJsDay === 0 ? 7 : currentJsDay;
+        var tagDefs = [
+          { key: "montag", dayNum: 1 }, { key: "dienstag", dayNum: 2 },
+          { key: "mittwoch", dayNum: 3 }, { key: "donnerstag", dayNum: 4 },
+          { key: "freitag", dayNum: 5 }, { key: "samstag", dayNum: 6 }, { key: "sonntag", dayNum: 7 }
+        ];
+        for (var tdI = 0; tdI < tagDefs.length; tdI++) {
+          var tDef = tagDefs[tdI];
+          var diff = tDef.dayNum - currentDayOfWeek;
+          if (diff < 0) diff += 7;
+          var tDate = new Date(now.getTime() + diff * 86400000);
+          var dStr = Utilities.formatDate(tDate, Session.getScriptTimeZone() || "Europe/Berlin", "dd.MM.");
+          tageDatum[tDef.key] = dStr;
+          tageLabelsMitDatum[tdI] = tageLabelsMitDatum[tdI].replace(/\s*\(.*\)/, "") + " (" + dStr + ")";
+        }
       }
     }
 
@@ -232,13 +255,18 @@ function doGet(e) {
       }
       if (sHeaderRow === -1) sHeaderRow = 6;
 
-      for (var si = sHeaderRow + 1; si < sData.length; si += 2) {
+      var si = sHeaderRow + 1;
+      while (si < sData.length) {
         var rName = sData[si][0] ? sData[si][0].toString().trim() : "";
         var dName = sData[si][1] ? sData[si][1].toString().trim() : "";
 
-        if (!rName && !dName) continue;
+        if (!rName && !dName) { si++; continue; }
         var rNameLower = rName.toLowerCase();
-        if (rNameLower.startsWith("spieler ") || rNameLower === "real-name" || rNameLower === "name" || rNameLower.includes("spieler suchen")) continue;
+        if (rNameLower === "real-name" || rNameLower === "name" || rNameLower.includes("spieler suchen") || rNameLower.includes("lanewichtung")) { si++; continue; }
+
+        // Prüfen, ob die nächste Zeile eine Helden-Folgezeile (ohne neuen Namen) ist
+        var hasSubRow = (si + 1 < sData.length && !sData[si + 1][0] && !sData[si + 1][1]);
+        var subRowIdx = hasSubRow ? (si + 1) : -1;
 
         var weights = {};
         for (var col = 0; col < 5; col++) {
@@ -257,10 +285,10 @@ function doGet(e) {
               if (h1 && h1 !== "0" && h1 !== "NaN") heroesByLane[sHeaders[lIdx]].push(h1);
             }
           }
-          if (si + 1 < sData.length) {
+          if (subRowIdx !== -1) {
             for (var sub2 = 0; sub2 < 2; sub2++) {
-              if (colStart + sub2 < sData[si + 1].length) {
-                var h2 = sData[si + 1][colStart + sub2] ? sData[si + 1][colStart + sub2].toString().trim() : "";
+              if (colStart + sub2 < sData[subRowIdx].length) {
+                var h2 = sData[subRowIdx][colStart + sub2] ? sData[subRowIdx][colStart + sub2].toString().trim() : "";
                 if (h2 && h2 !== "0" && h2 !== "NaN") heroesByLane[sHeaders[lIdx]].push(h2);
               }
             }
@@ -273,6 +301,8 @@ function doGet(e) {
           lanewichtung: weights,
           mainhelden: heroesByLane
         });
+
+        si += (hasSubRow ? 2 : 1);
       }
     }
 
@@ -722,12 +752,15 @@ function getPlayerDetails() {
 
   var playerDetails = {};
 
-  for (var i = headerRowIdx + 1; i < data.length; i += 2) {
+  var i = headerRowIdx + 1;
+  while (i < data.length) {
     var realName = data[i][0] ? data[i][0].toString().trim() : "";
     var dcName   = data[i][1] ? data[i][1].toString().trim() : "";
 
-    if (!realName && !dcName) continue;
-    if (realName.toLowerCase().startsWith("spieler ") || realName === "Real-Name" || realName === "Name") continue;
+    if (!realName && !dcName) { i++; continue; }
+    if (realName === "Real-Name" || realName === "Name" || realName.toLowerCase().includes("spieler suchen")) { i++; continue; }
+    var hasSubRow = (i + 1 < data.length && !data[i + 1][0] && !data[i + 1][1]);
+    var subRowIdx = hasSubRow ? (i + 1) : -1;
 
     var weights = {};
     for (var col = 0; col < 5; col++) {
@@ -749,10 +782,10 @@ function getPlayerDetails() {
           if (h1 && h1 !== "0" && h1 !== "NaN" && h1 !== "") heroesByLane[lName].push(h1);
         }
       }
-      if (i + 1 < data.length) {
+      if (subRowIdx !== -1) {
         for (var sub2 = 0; sub2 < 2; sub2++) {
-          if (colStart + sub2 < data[i+1].length) {
-            var h2 = data[i+1][colStart + sub2] ? data[i+1][colStart + sub2].toString().trim() : "";
+          if (colStart + sub2 < data[subRowIdx].length) {
+            var h2 = data[subRowIdx][colStart + sub2] ? data[subRowIdx][colStart + sub2].toString().trim() : "";
             if (h2 && h2 !== "0" && h2 !== "NaN" && h2 !== "") heroesByLane[lName].push(h2);
           }
         }
@@ -762,6 +795,8 @@ function getPlayerDetails() {
     var detailsObj = { weights: weights, heroesByLane: heroesByLane };
     if (realName) playerDetails[realName] = detailsObj;
     if (dcName)   playerDetails[dcName]   = detailsObj;
+
+    i += (hasSubRow ? 2 : 1);
   }
 
   return playerDetails;
@@ -855,7 +890,7 @@ function BERECHNE_UEBERSCHNEIDUNGEN(namesRange, timesRange, rolesRange, minPlaye
 
   for (var r = 0; r < numRows; r += 2) {
     var name = namesRange[r][0];
-    if (!name || name.toString().trim() === "" || name.toString().startsWith("Spieler ")) continue;
+    if (!name || name.toString().trim() === "") continue;
 
     var cleanName = name.toString().trim();
     var roleStr = (rolesRange && rolesRange[r] && rolesRange[r][0]) ? rolesRange[r][0].toString().trim().toLowerCase() : "mainspieler";
